@@ -99,7 +99,6 @@ searchInput.type = 'search';
 const pgnInput = el('textarea', '', css.input);
 pgnInput.rows = 7;
 pgnInput.placeholder = 'Paste a PGN here…';
-const ecoFilter = el('select', '', css.input);
 const langSelect = el('select', '', 'max-width:105px;background:#172b49;color:white;border:1px solid #365477;border-radius:7px;padding:6px');
 
 function setNotice(message: string): void {
