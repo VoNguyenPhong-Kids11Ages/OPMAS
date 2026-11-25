@@ -16,7 +16,7 @@ describe('parsePgn', () => {
   });
 
   it('reads a custom starting FEN and escaped header values', () => {
-    const r = parsePgn('[Event "A \\"quoted\\" event"]\n[SetUp "1"]\n[FEN "8/8/8/8/8/8/4k3/4K3 w - - 0 1"]\n[Result "*"]\n\n1. Kf2 *');
+    const r = parsePgn('[Event "A \\"quoted\\" event"]\n[SetUp "1"]\n[FEN "4k3/8/8/8/8/8/8/4K3 w - - 0 1"]\n[Result "*"]\n\n1. Kf2 *');
     expect(r.headers['Event']).toBe('A "quoted" event');
     expect(r.headers['FEN']).toBe('8/8/8/8/8/8/4k3/4K3 w - - 0 1');
     expect(r.moves).toEqual(['Kf2']);
