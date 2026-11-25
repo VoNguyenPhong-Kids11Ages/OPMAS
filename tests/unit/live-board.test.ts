@@ -12,6 +12,11 @@ describe('live move-list parser', () => {
       .toEqual(['c5', 'Nf3', 'd6', 'd4', 'cxd4', 'Nxd4', 'Nf6+', 'O-O']);
   });
 
+  it('handles castling check suffixes, disambiguation and promotion', () => {
+    expect(parseSanTokens('1. O-O+ O-O-O# 2. Nbd7 R1e2 3. exd8=Q+'))
+      .toEqual(['O-O+', 'O-O-O#', 'Nbd7', 'R1e2', 'exd8=Q+']);
+  });
+
   it('ignores comments and non-SAN page text', () => {
     expect(parseSanTokens('1. d4 {Opening move} 0:05 d5 2. c4 (Queen’s Gambit) e6'))
       .toEqual(['d4', 'd5', 'c4', 'e6']);
