@@ -96,12 +96,24 @@ function confirmSafety(): boolean {
   return true;
 }
 
-const panel = el('section', '', 'position:absolute;right:16px;top:76px;width:min(390px,calc(100vw - 24px));max-height:82vh;overflow:auto;z-index:2;pointer-events:auto;box-sizing:border-box;background:#0d192c;color:#f4f7ff;border:1px solid #2876a8;border-radius:15px;padding:13px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 14px 48px #000b;display:none');
+const panel = el(
+  'section',
+  '',
+  'all:initial;position:fixed!important;right:16px!important;top:76px!important;left:auto!important;bottom:auto!important;width:min(390px,calc(100vw - 24px))!important;max-height:82vh!important;overflow:auto!important;z-index:2147483647!important;pointer-events:auto!important;box-sizing:border-box!important;background:#0d192c!important;color:#f4f7ff!important;border:1px solid #2876a8!important;border-radius:15px!important;padding:13px!important;font:14px/1.45 system-ui,sans-serif!important;box-shadow:0 14px 48px #000b!important;display:none'
+);
 panel.id = 'opmas-panel';
-const launcher = el('button', '♞ OPMAS', 'position:absolute;right:18px;bottom:20px;z-index:2;pointer-events:auto;border:1px solid #55c8f5;background:#102b55;color:#fff;border-radius:11px;padding:11px 15px;font-weight:850;letter-spacing:.4px;cursor:pointer;box-shadow:0 4px 20px #0009');
+panel.setAttribute('role', 'dialog');
+panel.setAttribute('aria-label', 'OPMAS Opening Master');
+
+const launcher = el(
+  'button',
+  '♞  OPMAS',
+  'all:initial;position:fixed!important;right:18px!important;bottom:20px!important;left:auto!important;top:auto!important;z-index:2147483647!important;pointer-events:auto!important;display:flex!important;align-items:center!important;gap:9px!important;border:1px solid #55c8f5!important;background:#102b55!important;color:#fff!important;border-radius:12px!important;padding:11px 15px!important;font:800 14px/1 system-ui,sans-serif!important;letter-spacing:.4px!important;cursor:pointer!important;box-shadow:0 4px 20px #0009!important;visibility:visible!important;opacity:1!important'
+);
 launcher.id = 'opmas-launcher';
 launcher.type = 'button';
 launcher.setAttribute('aria-label', 'Open OPMAS Opening Master');
+launcher.setAttribute('title', 'Open OPMAS Opening Master');
 const content = el('div');
 const notice = el('p', '', 'min-height:18px;margin:7px 2px;color:#71d9ff;font-size:12px');
 const searchInput = el('input', '', css.input);
@@ -297,21 +309,46 @@ launcher.onclick = () => {
 };
 const mount = el('div');
 mount.id = 'opmas-shadow-host';
-mount.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none';
+mount.setAttribute('data-opmas-host', 'true');
+mount.style.cssText = 'all:initial!important;display:block!important;position:fixed!important;inset:0!important;width:0!important;height:0!important;overflow:visible!important;z-index:2147483647!important;pointer-events:none!important;contain:none!important;transform:none!important';
 const shadow = mount.attachShadow({ mode: 'open' });
-shadow.append(panel, launcher);
+const shadowStyle = el('style');
+shadowStyle.textContent = `
+  :host { all: initial !important; }
+  *, *::before, *::after { box-sizing: border-box; }
+  button, input, textarea, select { font-family: system-ui, sans-serif; }
+  #opmas-launcher { -webkit-appearance: none; appearance: none; }
+`;
+shadow.append(shadowStyle, panel, launcher);
 
+let mounted = false;
 function ensureMounted(): void {
+  const root = document.documentElement;
+  if (!root) return;
   if (!mount.isConnected) {
-    (document.documentElement ?? document.body).append(mount);
-    console.info('[OPMAS] launcher mounted', location.href);
+    root.append(mount);
+    if (!mounted) {
+      mounted = true;
+      console.info('[OPMAS] launcher mounted', location.href);
+    }
   }
 }
-ensureMounted();
-const mountObserver = new MutationObserver(() => ensureMounted());
-if (document.documentElement) {
-  mountObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+function bootMount(): void {
+  ensureMounted();
+  if (document.documentElement && !mountObserverStarted) {
+    mountObserverStarted = true;
+    mountObserver.observe(document.documentElement, { childList: true, subtree: true });
+  }
 }
+let mountObserverStarted = false;
+const mountObserver = new MutationObserver(() => ensureMounted());
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootMount, { once: true });
+} else {
+  bootMount();
+}
+window.addEventListener('pageshow', ensureMounted);
 
 
 if (registerMenu) {
