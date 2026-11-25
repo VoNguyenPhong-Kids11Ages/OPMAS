@@ -18,11 +18,15 @@ OPMAS is a study-first chess opening companion for Chess.com and Lichess, built 
 - Strict live-play boundary: no engine, best-move hints, move recommendations, board clicks, premoves, or move submission. Explorer and PGN analysis remain unavailable while a game is active.
 - Live detector reads only the supported site's visible move-list DOM; selector changes by either site may temporarily prevent detection until the adapter is updated.
 
-## Live detection limitations\n\nThe live adapter is DOM-based and intentionally read-only. It does not request private game data or interact with the board. Lichess and Chess.com may change their page markup; if a move list is temporarily incomplete, OPMAS retries after subsequent DOM updates and through a short fallback poll instead of permanently caching the partial sequence. The opening label is only as precise as the bundled database and the moves visible on the page.
+## Live detection limitations
+
+The live adapter is DOM-based and intentionally read-only. It does not request private game data or interact with the board. Lichess and Chess.com may change their page markup; if a move list is temporarily incomplete, OPMAS retries after subsequent DOM updates and through a short fallback poll instead of permanently caching the partial sequence. The opening label is only as precise as the bundled database and the moves visible on the page.
 
 ## Piece artwork
 
-The board bundles the Chessnut SVG chess-piece set by Alexis Luengas, used under Apache License 2.0. See `src/chessnut-pieces.ts`, `NOTICE-CHESSNUT.md`, and `LICENSE-CHESSNUT.txt`. OPMAS does not copy Chess.com-owned piece artwork or imply endorsement by Chess.com.\n\n## Development
+The board bundles the Chessnut SVG chess-piece set by Alexis Luengas, used under Apache License 2.0. See `src/chessnut-pieces.ts`, `NOTICE-CHESSNUT.md`, and `LICENSE-CHESSNUT.txt`. OPMAS does not copy Chess.com-owned piece artwork or imply endorsement by Chess.com.
+
+## Development
 
 From the repository root:
 
