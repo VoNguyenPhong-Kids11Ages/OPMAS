@@ -20,7 +20,7 @@ export function parseSanTokens(text: string): string[] {
   for (let token of tokens) {
     token = token.trim().replace(/^\d+\.{1,3}/, '').replace(/[!?]+$/g, '');
     token = token.replace(/^[,;]+|[,;]+$/g, '');
-    if (SAN.test(token)) moves.push(token.replace(/^0-0(-0)?([+#]?)$/, 'O-O$1$2'));
+    if (SAN.test(token)) moves.push(token.replace(/^0-0-0([+#]?)$/, 'O-O-O$1').replace(/^0-0([+#]?)$/, 'O-O$1'));
   }
   return moves;
 }
