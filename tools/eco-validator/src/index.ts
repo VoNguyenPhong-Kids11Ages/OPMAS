@@ -4,7 +4,10 @@ import type { Opening } from '@opmas/opening-database';
 const list = JSON.parse(
   readFileSync(new URL('../../../data/openings/openings.json', import.meta.url), 'utf8'),
 ) as Opening[];
-if (!list.length) console.warn('openings.json is empty (run pnpm build:db first)');
+if (!list.length) {
+  console.error('openings.json is empty (run pnpm fetch:sources && pnpm build:db first)');
+  process.exit(1);
+}
 
 const errors: string[] = [];
 for (const o of list) {

@@ -18,8 +18,17 @@ export async function fetchLichessGame(id: string, f: Fetch = fetch): Promise<Re
   if (!r.ok) return { status: 'unknown' };
   const j = (await r.json()) as { status?: string; moves?: string; initialFen?: string; variant?: string };
   if (!j.status) return { status: 'unknown' };
-  if (j.status === 'created' || j.status === 'started') return { status: 'in-progress' };
   if (j.variant && j.variant !== 'standard') return { status: 'unknown' };
+  if (j.status === 'created' || j.status === 'started') return { status: 'in-progress' };
+
+  // Only explicitly recognized terminal statuses may pass the safety gate.
+  // Aborted/noStart and future API statuses remain unknown (fail-closed).
+  const finishedStatuses = new Set([
+    'mate', 'resign', 'stalemate', 'timeout', 'draw', 'outoftime',
+    'cheat', 'unknownFinish', 'variantEnd',
+  ]);
+  if (!finishedStatuses.has(j.status)) return { status: 'unknown' };
+
   return { status: 'finished', sans: (j.moves ?? '').split(' ').filter(Boolean), startFen: j.initialFen };
 }
 
@@ -54,7 +63,9 @@ export async function fetchChesscomGame(
       game?: { isFinished?: boolean; moveList?: string; pgnHeaders?: Record<string, string> };
     }).game ?? {};
   const result = g.pgnHeaders?.['Result'];
-  const finished = g.isFinished === true || (!!result && result !== '*');
+  const validResults = new Set(['1-0', '0-1', '1/2-1/2']);
+  const hasFinishedResult = typeof result === 'string' && validResults.has(result);
+  const finished = g.isFinished === true || hasFinishedResult;
   if (!finished) return { status: g.isFinished === false ? 'in-progress' : 'unknown' };
   return { status: 'finished', uci: decodeChesscomMoves(g.moveList ?? ''), startFen: g.pgnHeaders?.['FEN'] };
 }

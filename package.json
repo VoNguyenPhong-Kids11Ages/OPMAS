@@ -17,7 +17,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "release:web": "pnpm build:userscript && cp apps/userscript/dist/opmas.user.js apps/website/public/opmas.user.js && pnpm build:web"
+    "release:web": "pnpm build:userscript && mkdir -p apps/website/public && cp apps/userscript/dist/opmas.user.js apps/website/public/opmas.user.js && pnpm build:web"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
