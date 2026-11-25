@@ -12,7 +12,7 @@ const SAFETY_KEY = 'opmas-safety-v1';
 const FAV_KEY = 'opmas-favorites-v1';
 let tr = createTranslator(localStorage.getItem(LANG_KEY) ?? 'en');
 let activeTab: 'explorer' | 'analyzer' | 'favorites' = 'explorer';
-let selectedEco: string | null = null;
+let selectedPgn: string | null = null;
 let focusAfterRender: 'search' | 'pgn' | null = null;
 let gateAllowed = false;
 
@@ -160,12 +160,12 @@ function makeTabs(): HTMLElement {
 }
 
 function showOpening(opening: Opening, host: HTMLElement): void {
-  selectedEco = opening.eco;
+  selectedPgn = opening.pgn;
   const card = el('article', '', css.card);
   const top = el('div', '', 'display:flex;align-items:flex-start;justify-content:space-between;gap:8px');
   const name = el('div', '', 'min-width:0');
   name.append(el('div', opening.name, 'font-weight:800;color:#f4f8ff'), el('div', `ECO ${opening.eco} · ${opening.ply} plies`, css.muted));
-  top.append(name, button(isFavorite(opening.eco) ? '★ Saved' : '☆ Save', () => toggleFavorite(opening.eco)));
+  top.append(name, button(isFavorite(opening) ? '★ Saved' : '☆ Save', () => toggleFavorite(opening)));
   const moves = el('pre', opening.pgn, 'white-space:pre-wrap;overflow-wrap:anywhere;background:#08162d;padding:9px;border-radius:7px;color:#bfe7ff;font:12px/1.6 ui-monospace,monospace');
   const actions = el('div', '', 'display:flex;gap:7px;flex-wrap:wrap');
   actions.append(button('Copy moves', () => void copyText(opening.pgn)), button('Copy ECO', () => void copyText(opening.eco)));
@@ -226,7 +226,7 @@ function renderAnalyzer(host: HTMLElement): void {
       el('div', `${detection.opening.eco} · ${detection.opening.name}`, 'font-weight:850;color:#7bdcff'),
       el('p', `Matched at ply ${detection.ply} of ${parsed.moves.length} · ${detection.exact ? 'exact position' : 'deepest earlier match'}`, css.muted),
       el('p', `Moves parsed: ${parsed.moves.length} · Result: ${parsed.result}`, css.muted),
-      button('Save opening', () => toggleFavorite(detection.opening.eco)),
+      button('Save opening', () => toggleFavorite(detection.opening)),
     );
     result.replaceChildren(card);
   }, true);
