@@ -177,32 +177,35 @@ function showOpening(opening: Opening, host: HTMLElement): void {
 function renderExplorer(host: HTMLElement): void {
   const label = el('label', 'Opening Explorer', 'display:block;font-weight:800;margin:8px 0 3px');
   const hint = el('p', `Search across ${db.size.toLocaleString()} opening records. Select an entry to inspect its moves.`, css.muted);
-  ecoFilter.replaceChildren(new Option('All ECO codes', ''));
-  for (const letter of ['A', 'B', 'C', 'D', 'E']) ecoFilter.add(new Option(`ECO ${letter}`, letter));
-  ecoFilter.onchange = () => renderExplorer(host);
-  searchInput.oninput = () => renderExplorer(host);
-  const matches = (ecoFilter.value ? db.byEco(ecoFilter.value) : db.search(searchInput.value, 100))
-    .filter((opening) => {
-      if (!searchInput.value.trim()) return true;
-      const q = searchInput.value.trim().toLowerCase();
-      return `${opening.eco} ${opening.name} ${opening.pgn}`.toLowerCase().includes(q);
-    }).slice(0, 40);
+  const filter = el('select', '', css.input);
+  filter.add(new Option('All ECO codes', ''));
+  for (const letter of ['A', 'B', 'C', 'D', 'E']) filter.add(new Option(`ECO ${letter}`, letter));
+  const count = el('p', '', css.muted);
   const list = el('div');
-  const count = el('p', `Showing ${matches.length} result(s) · max 40`, css.muted);
-  for (const opening of matches) {
-    const item = button(`${opening.eco}  ·  ${opening.name}`, () => showOpening(opening, detail));
-    item.style.cssText += ';display:block;width:100%;text-align:left;margin:4px 0;white-space:normal';
-    list.append(item);
-  }
   const detail = el('div');
+  const updateList = (): void => {
+    const query = searchInput.value.trim().toLowerCase();
+    const matches = (filter.value ? db.byEco(filter.value) : db.all())
+      .filter((opening) => !query || `${opening.eco} ${opening.name} ${opening.pgn}`.toLowerCase().includes(query))
+      .slice(0, 40);
+    count.textContent = `Showing ${matches.length} result(s) · maximum 40`;
+    list.replaceChildren();
+    for (const opening of matches) {
+      const item = button(`${opening.eco} · ${opening.name}`, () => showOpening(opening, detail));
+      item.style.cssText += ';display:block;width:100%;text-align:left;margin:4px 0;white-space:normal';
+      list.append(item);
+    }
+  };
+  filter.onchange = updateList;
+  searchInput.oninput = updateList;
+  host.replaceChildren(label, hint, searchInput, filter, count, list, detail);
+  updateList();
   if (selectedEco) {
     const selected = db.all().find((opening) => opening.eco === selectedEco);
     if (selected) showOpening(selected, detail);
   }
-  host.replaceChildren(label, hint, searchInput, ecoFilter, count, list, detail);
   if (focusAfterRender === 'search') searchInput.focus();
 }
-
 function renderAnalyzer(host: HTMLElement): void {
   const heading = el('div', 'PGN Analyzer', 'font-weight:800;margin:8px 0 4px');
   const help = el('p', 'Paste a completed game PGN to identify its deepest matching opening. OPMAS does not provide live-game move assistance.', css.muted);
