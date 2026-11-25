@@ -6,11 +6,13 @@ export default defineConfig({
     monkey({
       entry: 'src/main.ts',
       userscript: {
-        name: 'OPMAS',
+        name: 'OPMAS — Opening Master',
         namespace: 'opmas',
-        version: '2.0.0',
-        description: 'Opening Master: multilingual opening library and PGN opening detector',
+        version: '2.1.0',
+        description: 'Pixel-branded chess opening explorer and PGN opening detector',
+        icon: 'https://raw.githubusercontent.com/VoNguyenPhong-Kids11Ages/OPMAS/feat/light-opening-explorer/apps/userscript/public/opmas-icon.svg',
         match: ['https://www.chess.com/*', 'https://lichess.org/*'],
+        grant: ['GM_registerMenuCommand'],
         'run-at': 'document-idle',
       },
       build: { fileName: 'opmas.user.js' },
