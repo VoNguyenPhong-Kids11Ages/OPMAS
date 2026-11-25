@@ -1,16 +1,23 @@
 {
   "name": "@opmas/userscript",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
   "dependencies": {
     "@opmas/integrations": "workspace:*",
     "@opmas/localization": "workspace:*",
     "@opmas/opening-database": "workspace:*",
     "@opmas/opening-detector": "workspace:*",
     "@opmas/pgn-parser": "workspace:*",
-    "@opmas/safety-gate": "workspace:*"
+    "@opmas/safety-gate": "workspace:*",
+    "@opmas/chess-core": "workspace:*"
   },
-  "devDependencies": { "vite": "^6.0.0", "vite-plugin-monkey": "^5.0.0" }
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "vite-plugin-monkey": "^5.0.0"
+  }
 }

@@ -18,4 +18,11 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm release:web
+      - name: Upload built userscript
+        uses: actions/upload-artifact@v4
+        with:
+          name: opmas-userscript
+          path: apps/userscript/dist/opmas.user.js
+          if-no-files-found: error
+          retention-days: 14
       - run: pnpm exec playwright install --with-deps chromium && pnpm test:e2e

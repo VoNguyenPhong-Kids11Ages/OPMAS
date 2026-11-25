@@ -15,6 +15,7 @@ function send(res: ServerResponse, code: number, body?: unknown): void {
     'content-type': 'application/json',
     'access-control-allow-origin': ORIGIN,
     'access-control-allow-headers': 'content-type',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
   });
   res.end(body === undefined ? undefined : JSON.stringify(body));
 }
@@ -38,7 +39,8 @@ createServer(async (req, res) => {
     if (url.pathname === '/openings') return send(res, 200, db.search(url.searchParams.get('q') ?? '', 50));
     if (url.pathname === '/detect' && req.method === 'POST') {
       const { pgn } = JSON.parse(await readBody(req)) as { pgn?: string };
-      return send(res, 200, detectOpening(db, parsePgn(pgn ?? '').moves));
+      const parsed = parsePgn(pgn ?? '');
+      return send(res, 200, detectOpening(db, parsed.moves, parsed.headers['FEN']));
     }
     if (url.pathname === '/game') {
       // Only ids parsed from chess.com/lichess game URLs are fetched (no open proxy); finished games only.

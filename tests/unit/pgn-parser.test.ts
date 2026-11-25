@@ -14,4 +14,11 @@ describe('parsePgn', () => {
   it('normalises 0-0 castling and ignores junk text', () => {
     expect(parsePgn('1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. 0-0 dad4 hello').moves.at(-1)).toBe('O-O');
   });
+
+  it('reads a custom starting FEN and escaped header values', () => {
+    const r = parsePgn('[Event "A \\"quoted\\" event"]\n[SetUp "1"]\n[FEN "4k3/8/8/8/8/8/8/4K3 w - - 0 1"]\n[Result "*"]\n\n1. Kf2 *');
+    expect(r.headers['Event']).toBe('A "quoted" event');
+    expect(r.headers['FEN']).toBe('4k3/8/8/8/8/8/8/4K3 w - - 0 1');
+    expect(r.moves).toEqual(['Kf2']);
+  });
 });
