@@ -90,7 +90,7 @@ function readLichessBootstrapMoves(doc: Document): string[] {
     if (!game || !Array.isArray(game.steps)) return [];
     const moves = game.steps
       .filter((step): step is { ply: number; san: string } =>
-        Number.isInteger(step.ply) && step.ply > 0 && typeof step.san === 'string' && step.san.length > 0)
+        typeof step.ply === 'number' && Number.isInteger(step.ply) && step.ply > 0 && typeof step.san === 'string' && step.san.length > 0)
       .sort((a, b) => a.ply - b.ply)
       .map((step) => step.san);
     // A partially serialized bootstrap payload must not replace a good DOM read.
