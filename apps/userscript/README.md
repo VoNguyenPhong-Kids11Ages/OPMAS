@@ -1,17 +1,18 @@
 # OPMAS Userscript
 
-Tampermonkey userscript for Chess.com and Lichess, built with Vite and `vite-plugin-monkey`.
+OPMAS is a study-first chess opening companion for Chess.com and Lichess, built with Vite and `vite-plugin-monkey`.
 
 ## Features
 
-- Pixel-style OPMAS knight identity and floating launcher mounted in an isolated Shadow DOM, with automatic remount if the host page replaces its DOM.
-- Tampermonkey commands: Open Explorer, Analyze PGN, Saved openings, Close GUI.
-- Opening Explorer searches ECO, opening names, and move strings across the bundled database.
-- ECO family filter (A–E), opening detail view, copy moves/ECO actions.
-- Local saved-opening list using browser localStorage.
-- PGN Analyzer detects the deepest matching opening position and reports matched ply, parsed move count, and game result.
-- Language selector using the shared localization package.
-- Safety gate remains active on game pages; the userscript does not provide live-game move assistance.
+- Light, responsive floating interface isolated in Shadow DOM.
+- Opening Explorer for the bundled opening database: search by ECO, name, or moves; filter ECO families; progressively load results.
+- Interactive board replay for opening main lines, with start/previous/next/end controls.
+- PGN Analyzer identifies the deepest matching opening position and reports the matched ply and game result.
+- Favorites stored locally by ECO code, with migration from the previous storage format.
+- Vietnamese-first interface with the shared language selector.
+- Tampermonkey menu commands and keyboard Escape to close.
+- Defensive mount recovery for pages that replace their DOM.
+- Safety gate disables the Explorer and PGN tools on active play pages. No live-game move suggestions or engine assistance.
 
 ## Development
 
@@ -24,17 +25,19 @@ pnpm build:userscript
 
 Build output: `apps/userscript/dist/opmas.user.js`.
 
-The generated `dist/` directory is intentionally ignored by Git. CI uploads the built script as the `opmas-userscript` artifact. The website release workflow also copies it into `apps/website/public/opmas.user.js`.
+The generated `dist/` directory is intentionally not committed. CI uploads the built script as the `opmas-userscript` artifact, and the website release script copies it to `apps/website/public/opmas.user.js`.
 
 ## Install
 
-1. Build the userscript locally or download the CI artifact.
-2. Open the generated `opmas.user.js` in a browser with Tampermonkey installed.
-3. Confirm installation, then open Chess.com or Lichess.
-4. Use the floating OPMAS launcher or Tampermonkey's OPMAS menu commands.
+1. Build the userscript locally or download the latest successful CI artifact.
+2. Open `opmas.user.js` in a browser with Tampermonkey installed.
+3. Confirm installation, then visit Chess.com or Lichess.
+4. Open OPMAS from the floating launcher or the Tampermonkey menu.
 
-## Storage
+## Local storage
 
-- `opmas-language`: selected UI language.
-- `opmas-favorites-v1`: saved ECO codes.
-- `opmas-safety-v1`: current-session safety confirmation.
+- `opmas-language`: selected language.
+- `opmas-favorites-v2`: saved ECO codes.
+- `opmas-safety-v2`: study-use confirmation for the current browser storage.
+
+The older `opmas-favorites-v1` list is migrated when possible.
