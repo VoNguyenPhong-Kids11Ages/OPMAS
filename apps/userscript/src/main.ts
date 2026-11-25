@@ -8,7 +8,7 @@ import { checkGate } from '@opmas/safety-gate';
 import { fetchStatus } from '@opmas/integrations';
 import { parseGameUrl, isPlayContext } from '@opmas/safety-gate';
 import { getLiveSearchRoots, readLiveMoves } from './live-board';
-import { CHESSNUT_PIECES } from './chessnut-pieces';
+import { CHESSNUT_PIECES } from '../../../packages/ui-components/src/chessnut-pieces';
 
 const db = new OpeningDatabase(openings as Opening[]);
 const KEYS = { language: 'opmas-language', favorites: 'opmas-favorites-v2', safety: 'opmas-safety-v2' };
@@ -198,7 +198,7 @@ function renderBoard(fen: string, host: HTMLElement, lastMove?: string): void {
     highlighted.add(lastMove.slice(0, 2));
     highlighted.add(lastMove.slice(2, 4));
   }
-  const board = el('div', '', 'display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:min(100%,340px);aspect-ratio:1;margin:12px auto;border:5px solid #344d35;border-radius:8px;overflow:hidden;box-shadow:0 9px 24px #17243a24;background:#344d35;isolation:isolate');
+  const board = el('div', '', 'display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:min(100%,360px);aspect-ratio:1;margin:14px auto;padding:4px;border:1px solid #243248;border-radius:13px;overflow:hidden;box-shadow:0 12px 30px #17243a30;background:linear-gradient(145deg,#35465e,#1d2a3c);isolation:isolate');
   board.setAttribute('role', 'img');
   board.setAttribute('aria-label', 'OPMAS chess board');
   const rows = fen.split(' ')[0]?.split('/') ?? [];
@@ -210,7 +210,7 @@ function renderBoard(fen: string, host: HTMLElement, lastMove?: string): void {
       for (let n = 0; n < count && file < 8; n++, file++) {
         const light = (rank + file) % 2 === 0;
         const squareName = `${files[file]}${8 - rank}`;
-        const squareColor = highlighted.has(squareName) ? '#f6f669' : light ? '#eeeed2' : '#769656';
+        const squareColor = highlighted.has(squareName) ? '#e8c75a' : light ? '#e8edf4' : '#71869f';
         const square = el('div', '', `position:relative;display:grid;place-items:center;min-width:0;aspect-ratio:1;background:${squareColor};overflow:hidden`);
         if (!/^[1-8]$/.test(char) && n === 0) {
           const image = el('img') as HTMLImageElement;
@@ -218,11 +218,11 @@ function renderBoard(fen: string, host: HTMLElement, lastMove?: string): void {
           image.alt = char;
           image.draggable = false;
           image.decoding = 'async';
-          image.style.cssText = 'display:block;width:91%;height:91%;object-fit:contain;filter:drop-shadow(0 1px 1px #17243a35);pointer-events:none;user-select:none';
+          image.style.cssText = 'display:block;width:94%;height:94%;object-fit:contain;filter:drop-shadow(0 2px 2px #17243a45);pointer-events:none;user-select:none';
           square.append(image);
         }
         if (file === 0) {
-          const rankLabel = el('span', String(8 - rank), `position:absolute;top:2px;left:3px;font:700 9px/1 system-ui;color:${light ? '#769656' : '#eeeed2'};opacity:.9;pointer-events:none`);
+          const rankLabel = el('span', String(8 - rank), `position:absolute;top:2px;left:3px;font:700 9px/1 system-ui;color:${light ? '#71869f' : '#e8edf4'};opacity:.9;pointer-events:none`);
           square.append(rankLabel);
         }
         if (rank === 7) {
@@ -463,7 +463,7 @@ function renderLiveDetector(host: HTMLElement): void {
   // Observe the page and all currently-open shadow roots. Re-scan after
   // DOM changes so newly-mounted web components are attached automatically.
   let updateQueued = false;
-  const observerOptions: MutationObserverInit = { childList: true, subtree: true, characterData: true };
+  const observerOptions: MutationObserverInit = { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'data-san', 'data-ply'] };
   function attachLiveObservers(): void {
     for (const root of getLiveSearchRoots(document)) {
       const target: Node = root === document ? document.documentElement : root;
