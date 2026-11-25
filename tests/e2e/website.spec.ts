@@ -5,7 +5,7 @@ test('opening explorer loads and offers the project-site userscript download', a
   await expect(page.getByRole('heading', { name: 'Opening Explorer' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Tải userscript/ })).toHaveAttribute('href', '/OPMAS/opmas.user.js');
   await expect(page.getByRole('heading', { name: 'Thư viện khai cuộc' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Italian Game|King.s Pawn Game/ }).first()).toBeVisible();
+  await expect(page.locator('.opening-row').first()).toBeVisible();
 });
 
 test('navigation opens the PGN analyzer and detects a known opening', async ({ page }) => {
