@@ -46,7 +46,12 @@ function button(label: string, action: () => void, primary = false): HTMLButtonE
 function getFavorites(): string[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]');
-    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string').map((item) => {
+          if (item.includes(' ')) return item;
+          return db.all().find((opening) => opening.eco === item)?.pgn ?? item;
+        })
+      : [];
   } catch {
     return [];
   }
@@ -218,7 +223,7 @@ function renderAnalyzer(host: HTMLElement): void {
       result.replaceChildren(el('p', 'No valid SAN moves found. Check the PGN text.', 'color:#ffbd75'));
       return;
     }
-    const detection = detectOpening(db, parsed.moves);
+    const detection = detectOpening(db, parsed.moves, parsed.headers['FEN']);
     if (!detection) {
       result.replaceChildren(el('p', 'No matching opening position found in the database.', css.muted));
       return;
