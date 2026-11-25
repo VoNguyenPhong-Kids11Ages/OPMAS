@@ -8,7 +8,7 @@ export default defineConfig({
       userscript: {
         name: 'OPMAS — Opening Master',
         namespace: 'opmas',
-        version: '2.1.1',
+        version: '2.1.2',
         description: 'Pixel-branded chess opening explorer with isolated floating launcher and PGN opening detector',
         icon: 'https://raw.githubusercontent.com/VoNguyenPhong-Kids11Ages/OPMAS/feat/light-opening-explorer/apps/userscript/public/opmas-icon.svg',
         match: ['https://www.chess.com/*', 'https://lichess.org/*'],
