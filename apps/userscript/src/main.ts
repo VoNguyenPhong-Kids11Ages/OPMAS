@@ -114,6 +114,34 @@ launcher.id = 'opmas-launcher';
 launcher.type = 'button';
 launcher.setAttribute('aria-label', 'Open OPMAS Opening Master');
 launcher.setAttribute('title', 'Open OPMAS Opening Master');
+
+// Original pixel-knight mark, drawn inline so the launcher never depends on a remote image.
+const knightPixels = [
+  '0011100',
+  '0111110',
+  '1110111',
+  '1111111',
+  '0111100',
+  '0011110',
+  '0110110',
+];
+const knightSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+knightSvg.setAttribute('viewBox', '0 0 7 7');
+knightSvg.setAttribute('width', '22');
+knightSvg.setAttribute('height', '22');
+knightSvg.setAttribute('aria-hidden', 'true');
+knightSvg.style.cssText = 'display:block;flex:none;image-rendering:pixelated';
+knightPixels.forEach((line, y) => [...line].forEach((pixel, x) => {
+  if (pixel !== '1') return;
+  const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  square.setAttribute('x', String(x));
+  square.setAttribute('y', String(y));
+  square.setAttribute('width', '1');
+  square.setAttribute('height', '1');
+  square.setAttribute('fill', y < 3 ? '#ffd66b' : '#eaf6ff');
+  knightSvg.append(square);
+}));
+launcher.replaceChildren(knightSvg, document.createTextNode('OPMAS'));
 const content = el('div');
 const notice = el('p', '', 'min-height:18px;margin:7px 2px;color:#71d9ff;font-size:12px');
 const searchInput = el('input', '', css.input);
