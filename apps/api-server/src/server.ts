@@ -39,7 +39,8 @@ createServer(async (req, res) => {
     if (url.pathname === '/openings') return send(res, 200, db.search(url.searchParams.get('q') ?? '', 50));
     if (url.pathname === '/detect' && req.method === 'POST') {
       const { pgn } = JSON.parse(await readBody(req)) as { pgn?: string };
-      return send(res, 200, detectOpening(db, parsePgn(pgn ?? '').moves, parsePgn(pgn ?? '').headers['FEN']));
+      const parsed = parsePgn(pgn ?? '');
+      return send(res, 200, detectOpening(db, parsed.moves, parsed.headers['FEN']));
     }
     if (url.pathname === '/game') {
       // Only ids parsed from chess.com/lichess game URLs are fetched (no open proxy); finished games only.
