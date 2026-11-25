@@ -6,6 +6,8 @@ import { parsePgn } from '@opmas/pgn-parser';
 import { createTranslator, LOCALES } from '@opmas/localization';
 import { checkGate } from '@opmas/safety-gate';
 import { fetchStatus } from '@opmas/integrations';
+import { parseGameUrl, isPlayContext } from '@opmas/safety-gate';
+import { readLiveMoves } from './live-board';
 
 const db = new OpeningDatabase(openings as Opening[]);
 const KEYS = { language: 'opmas-language', favorites: 'opmas-favorites-v2', safety: 'opmas-safety-v2' };
@@ -14,6 +16,9 @@ type Tab = 'explorer' | 'analyzer' | 'favorites';
 let activeTab: Tab = 'explorer';
 let selectedEco: string | null = null;
 let gateAllowed = false;
+let liveMode = false;
+let liveRefreshTimer: number | null = null;
+let liveObserver: MutationObserver | null = null;
 let renderToken = 0;
 
 type MenuRegistrar = (caption: string, callback: () => void) => number;
@@ -93,8 +98,8 @@ async function copyText(value: string): Promise<void> {
 function confirmSafety(): boolean {
   if (safeStorageGet(KEYS.safety) === 'true') return true;
   const accepted = confirm(t(
-    'OPMAS chỉ dùng để học và tra cứu khai cuộc ngoài ván đấu. Công cụ sẽ khóa trên trang đang chơi để tránh hỗ trợ gian lận. Tiếp tục?',
-    'OPMAS is for opening study outside active games. It locks on live-play pages to prevent unfair assistance. Continue?',
+    'OPMAS dùng để học khai cuộc. Trên bàn đang chơi, công cụ chỉ đọc lịch sử nước đi để nhận diện khai cuộc/biến thể; không gợi ý nước đi hay can thiệp bàn cờ. Tiếp tục?',
+    'OPMAS is for opening study. On live boards it only reads move history to identify the opening/variation; it does not suggest moves or interact with the board. Continue?',
   ));
   if (accepted) safeStorageSet(KEYS.safety, 'true');
   return accepted;
@@ -118,7 +123,13 @@ const pgnInput = el('textarea', '', style.input);
 pgnInput.rows = 8;
 pgnInput.placeholder = '1. e4 e5 2. Nf3 Nc6 3. Bb5 ...';
 
-function closePanel(): void { panel.style.display = 'none'; }
+function stopLiveMonitor(): void {
+  if (liveRefreshTimer !== null) window.clearInterval(liveRefreshTimer);
+  liveRefreshTimer = null;
+  liveObserver?.disconnect();
+  liveObserver = null;
+}
+function closePanel(): void { panel.style.display = 'none'; stopLiveMonitor(); }
 function openPanel(tab: Tab = 'explorer', focus: 'search' | 'pgn' | null = null): void {
   if (!confirmSafety()) return;
   activeTab = tab;
@@ -318,8 +329,84 @@ function renderFavorites(host: HTMLElement): void {
     }
   }));
 }
+function renderLiveDetector(host: HTMLElement): void {
+  stopLiveMonitor();
+  const siteLabel = location.hostname.includes('lichess.org') ? 'Lichess' : 'Chess.com';
+  const banner = el('div', '', 'padding:11px 12px;border:1px solid #b8d7fb;border-radius:11px;background:#eff6ff;color:#174b83;font-size:12px;line-height:1.55');
+  banner.append(
+    el('div', '● LIVE · READ-ONLY', 'font-size:11px;font-weight:900;letter-spacing:.7px;color:#1769d2'),
+    el('div', t('Đang đọc lịch sử nước đi hiển thị trên ', 'Reading the visible move list on ') + siteLabel + t('. Chỉ nhận diện khai cuộc, không gợi ý nước đi.', '. Opening identification only; no move suggestions.')),
+  );
+  const status = el('div', t('Đang chờ dữ liệu nước đi…', 'Waiting for move-list data…'), style.muted);
+  const result = el('div');
+  const moveLine = el('pre', '', 'white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:9px;background:#f5f8fc;color:#31445e;font:12px/1.7 ui-monospace,SFMono-Regular,monospace');
+  const refresh = actionButton(t('Làm mới', 'Refresh'), () => update(), true);
+  const details = el('div');
+  host.append(
+    makeSectionTitle(t('Live Opening Detector', 'Live Opening Detector'), t('Theo dõi tên khai cuộc và biến thể từ move list của bàn cờ được hỗ trợ.', 'Identify the opening and variation from the supported board move list.')),
+    banner, status, result, el('div', t('Lịch sử nước đi đọc được', 'Detected move history'), 'font-size:12px;font-weight:800;margin:12px 0 5px;color:#31445e'),
+    moveLine, refresh, details,
+  );
+
+  let lastSignature = '';
+  function update(): void {
+    if (panel.style.display === 'none') return;
+    const live = readLiveMoves(document, location.href);
+    if (!live) {
+      status.textContent = t('Không nhận diện được trang bàn cờ được hỗ trợ.', 'This is not a supported chess-board page.');
+      return;
+    }
+    const signature = live.moves.join(' ');
+    if (signature === lastSignature) return;
+    lastSignature = signature;
+    moveLine.textContent = signature || t('Chưa đọc được nước đi. Mở move list hoặc đợi trang tải xong.', 'No moves detected yet. Open the move list or wait for the page to load.');
+    status.textContent = live.moves.length
+      ? t(`Đã đọc ${live.moves.length} nửa nước · cập nhật tự động`, `Read ${live.moves.length} plies · auto-updating`)
+      : t('Chưa có dữ liệu move list. OPMAS sẽ thử lại tự động.', 'No move-list data yet. OPMAS will retry automatically.');
+    result.replaceChildren();
+    details.replaceChildren();
+    if (!live.moves.length) return;
+
+    const detection = detectOpening(db, live.moves);
+    if (!detection) {
+      result.append(el('div', t('Chưa khớp khai cuộc trong thư viện OPMAS.', 'No matching opening found in the OPMAS library.'), `padding:12px;border:1px solid #f1dfb9;border-radius:10px;background:#fffaf0;color:${palette.amber};font-size:12px`));
+      return;
+    }
+    const card = el('article', '', style.card);
+    card.append(
+      el('div', detection.opening.name, 'font-size:16px;font-weight:900;color:#17243a'),
+      el('div', `ECO ${detection.opening.eco} · ${detection.opening.ply} ${t('nửa nước trong dòng lý thuyết', 'theory plies')}`, 'margin-top:4px;color:#1769d2;font-size:12px;font-weight:800'),
+      el('p', detection.exact
+        ? t('Khớp chính xác với dòng khai cuộc trong cơ sở dữ liệu.', 'Exact match with a line in the opening database.')
+        : t('Đây là vị trí khớp sâu nhất tìm được; ván có thể đã đi vào biến phụ hoặc chuyển vị.', 'Deepest matching position found; the game may have entered a side variation or transposition.'), style.muted),
+    );
+    const afterTheory = live.moves.slice(detection.ply);
+    card.append(el('div', afterTheory.length
+      ? t(`Sau đoạn lý thuyết: ${afterTheory.join(' ')}`, `Moves after the matched theory: ${afterTheory.join(' ')}`)
+      : t('Chưa có nước đi vượt khỏi đoạn lý thuyết được nhận diện.', 'No moves beyond the detected theory line yet.'), 'padding:9px;border-radius:8px;background:#f5f8fc;color:#31445e;font-size:11px;line-height:1.6'));
+    card.append(actionButton(t('Lưu khai cuộc', 'Save opening'), () => {
+      const favorites = getFavorites();
+      if (!favorites.includes(detection.opening.eco)) {
+        safeStorageSet(KEYS.favorites, JSON.stringify([...favorites, detection.opening.eco]));
+        setNotice(t('Đã lưu khai cuộc vào bộ sưu tập.', 'Opening saved to your collection.'));
+      } else setNotice(t('Khai cuộc đã được lưu rồi.', 'Opening is already saved.'));
+    }));
+    result.append(card);
+  }
+  update();
+  liveObserver = new MutationObserver(() => update());
+  if (document.body) liveObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+  liveRefreshTimer = window.setInterval(update, 1400);
+}
+
 function renderContent(): void {
   content.replaceChildren(makeTabs());
+  if (liveMode) {
+    const view = el('div');
+    content.append(view);
+    renderLiveDetector(view);
+    return;
+  }
   if (!gateAllowed) {
     const warning = el('div', t('OPMAS đang khóa trên trang chơi. Hãy mở trang phân tích hoặc thư viện sau khi ván đấu kết thúc.', 'OPMAS is locked on play pages. Open the analysis or library page after the game ends.'), 'padding:13px;border:1px solid #f4d7a2;border-radius:11px;background:#fff8e9;color:#87520c;font-size:12px;line-height:1.5');
     content.append(warning);
@@ -334,11 +421,13 @@ function renderContent(): void {
 async function render(focus: 'search' | 'pgn' | null = null): Promise<void> {
   const token = ++renderToken;
   panel.replaceChildren(makeHeader(), notice, content);
-  const gate = await checkGate(location.href, fetchStatus);
+  const isSupportedGame = !!parseGameUrl(location.href) || isPlayContext(location.href);
+  const gate = isSupportedGame ? { allowed: false as const, reason: 'game-in-progress' as const } : await checkGate(location.href, fetchStatus);
   if (token !== renderToken) return;
+  liveMode = isSupportedGame;
   gateAllowed = gate.allowed;
   const status = el('div', '', 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:9px;background:#f5f8fc;color:#718096;font-size:11px');
-  status.append(el('span', `${db.size.toLocaleString()} ${t('khai cuộc trong thư viện', 'openings in library')}`), el('span', gateAllowed ? '● Ready' : '● Locked', `font-weight:800;color:${gateAllowed ? palette.green : palette.amber}`));
+  status.append(el('span', `${db.size.toLocaleString()} ${t('khai cuộc trong thư viện', 'openings in library')}`), el('span', liveMode ? '● LIVE · READ-ONLY' : gateAllowed ? '● Ready' : '● Locked', `font-weight:800;color:${liveMode ? palette.blue : gateAllowed ? palette.green : palette.amber}`));
   panel.insertBefore(status, content);
   renderContent();
   if (focus === 'search' && activeTab === 'explorer') searchInput.focus();
@@ -394,6 +483,7 @@ let lastUrl = location.href;
 window.setInterval(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
+    stopLiveMonitor();
     if (panel.style.display !== 'none') void render();
   }
 }, 1200);
