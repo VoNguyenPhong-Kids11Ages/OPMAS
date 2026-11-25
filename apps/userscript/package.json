@@ -13,7 +13,8 @@
     "@opmas/opening-database": "workspace:*",
     "@opmas/opening-detector": "workspace:*",
     "@opmas/pgn-parser": "workspace:*",
-    "@opmas/safety-gate": "workspace:*"
+    "@opmas/safety-gate": "workspace:*",
+    "@opmas/chess-core": "workspace:*"
   },
   "devDependencies": {
     "vite": "^6.0.0",
