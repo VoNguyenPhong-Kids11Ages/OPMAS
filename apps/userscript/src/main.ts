@@ -7,7 +7,7 @@ import { createTranslator, LOCALES } from '@opmas/localization';
 import { checkGate } from '@opmas/safety-gate';
 import { fetchStatus } from '@opmas/integrations';
 import { parseGameUrl, isPlayContext } from '@opmas/safety-gate';
-import { readLiveMoves } from './live-board';
+import { getLiveSearchRoots, readLiveMoves } from './live-board';
 import { CHESSNUT_PIECES } from './chessnut-pieces';
 
 const db = new OpeningDatabase(openings as Opening[]);
@@ -192,7 +192,12 @@ const PIECE_URLS: Record<string, string> = Object.fromEntries(
   ]),
 );
 
-function renderBoard(fen: string, host: HTMLElement): void {
+function renderBoard(fen: string, host: HTMLElement, lastMove?: string): void {
+  const highlighted = new Set<string>();
+  if (lastMove && /^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(lastMove)) {
+    highlighted.add(lastMove.slice(0, 2));
+    highlighted.add(lastMove.slice(2, 4));
+  }
   const board = el('div', '', 'display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:min(100%,340px);aspect-ratio:1;margin:12px auto;border:5px solid #344d35;border-radius:8px;overflow:hidden;box-shadow:0 9px 24px #17243a24;background:#344d35;isolation:isolate');
   board.setAttribute('role', 'img');
   board.setAttribute('aria-label', 'OPMAS chess board');
@@ -204,7 +209,9 @@ function renderBoard(fen: string, host: HTMLElement): void {
       const count = /^[1-8]$/.test(char) ? Number(char) : 1;
       for (let n = 0; n < count && file < 8; n++, file++) {
         const light = (rank + file) % 2 === 0;
-        const square = el('div', '', `position:relative;display:grid;place-items:center;min-width:0;aspect-ratio:1;background:${light ? '#eeeed2' : '#769656'};overflow:hidden`);
+        const squareName = `${files[file]}${8 - rank}`;
+        const squareColor = highlighted.has(squareName) ? '#f6f669' : light ? '#eeeed2' : '#769656';
+        const square = el('div', '', `position:relative;display:grid;place-items:center;min-width:0;aspect-ratio:1;background:${squareColor};overflow:hidden`);
         if (!/^[1-8]$/.test(char) && n === 0) {
           const image = el('img') as HTMLImageElement;
           image.src = PIECE_URLS[char] ?? '';
@@ -395,7 +402,7 @@ function renderLiveDetector(host: HTMLElement): void {
       const latest = frames[frames.length - 1];
       if (latest?.fen) {
         lastFen = latest.fen;
-        renderBoard(lastFen, boardHost);
+        renderBoard(lastFen, boardHost, latest.uci);
         boardMeta.textContent = t('Vị trí hiện tại · ' + live.moves.length + ' nửa nước · lượt ' + (live.moves.length % 2 === 0 ? 'Trắng' : 'Đen'), 'Current position · ' + live.moves.length + ' plies · ' + (live.moves.length % 2 === 0 ? 'White' : 'Black') + ' to move');
       } else {
         renderBoard(lastFen, boardHost);
@@ -528,7 +535,7 @@ let mountObserverStarted = false;
 const mountObserver = new MutationObserver(() => ensureMounted());
 function bootMount(): void {
   ensureMounted();
-  if (isLiveGameContext()) {
+  if (isLiveGameContext() && confirmSafety()) {
     panel.style.display = 'block';
     void render();
   }
@@ -553,7 +560,10 @@ window.setInterval(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     stopLiveMonitor();
-    if (isLiveGameContext()) panel.style.display = 'block';
+    if (isLiveGameContext()) {
+      if (confirmSafety()) panel.style.display = 'block';
+      else closePanel();
+    }
     if (panel.style.display !== 'none') void render();
   }
 }, 1200);
