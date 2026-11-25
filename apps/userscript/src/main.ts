@@ -96,8 +96,12 @@ function confirmSafety(): boolean {
   return true;
 }
 
-const panel = el('section', '', 'position:fixed;right:16px;top:76px;width:min(390px,calc(100vw - 24px));max-height:82vh;overflow:auto;z-index:2147483647;box-sizing:border-box;background:#0d192c;color:#f4f7ff;border:1px solid #2876a8;border-radius:15px;padding:13px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 14px 48px #000b;display:none');
-const launcher = el('button', '♞ OPMAS', 'position:fixed;right:18px;bottom:20px;z-index:2147483646;border:1px solid #55c8f5;background:#102b55;color:#fff;border-radius:11px;padding:11px 15px;font-weight:850;letter-spacing:.4px;cursor:pointer;box-shadow:0 4px 20px #0009');
+const panel = el('section', '', 'position:absolute;right:16px;top:76px;width:min(390px,calc(100vw - 24px));max-height:82vh;overflow:auto;z-index:2;pointer-events:auto;box-sizing:border-box;background:#0d192c;color:#f4f7ff;border:1px solid #2876a8;border-radius:15px;padding:13px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 14px 48px #000b;display:none');
+panel.id = 'opmas-panel';
+const launcher = el('button', '♞ OPMAS', 'position:absolute;right:18px;bottom:20px;z-index:2;pointer-events:auto;border:1px solid #55c8f5;background:#102b55;color:#fff;border-radius:11px;padding:11px 15px;font-weight:850;letter-spacing:.4px;cursor:pointer;box-shadow:0 4px 20px #0009');
+launcher.id = 'opmas-launcher';
+launcher.type = 'button';
+launcher.setAttribute('aria-label', 'Open OPMAS Opening Master');
 const content = el('div');
 const notice = el('p', '', 'min-height:18px;margin:7px 2px;color:#71d9ff;font-size:12px');
 const searchInput = el('input', '', css.input);
@@ -291,7 +295,24 @@ launcher.onclick = () => {
   if (panel.style.display !== 'none') return closePanel();
   openPanel();
 };
-document.body.append(panel, launcher);
+const mount = el('div');
+mount.id = 'opmas-shadow-host';
+mount.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none';
+const shadow = mount.attachShadow({ mode: 'open' });
+shadow.append(panel, launcher);
+
+function ensureMounted(): void {
+  if (!mount.isConnected) {
+    (document.documentElement ?? document.body).append(mount);
+    console.info('[OPMAS] launcher mounted', location.href);
+  }
+}
+ensureMounted();
+const mountObserver = new MutationObserver(() => ensureMounted());
+if (document.documentElement) {
+  mountObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
+
 
 if (registerMenu) {
   registerMenu('♞ OPMAS — Open Explorer', () => openPanel('explorer', 'search'));
