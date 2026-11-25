@@ -393,7 +393,7 @@ function renderLiveDetector(host: HTMLElement): void {
     if (signature === lastSignature && live.moves.length > 0) return;
     moveLine.textContent = signature || t('Chưa đọc được nước đi. Mở move list hoặc đợi trang tải xong.', 'No moves detected yet. OPMAS will retry automatically.');
     status.textContent = live.moves.length
-      ? t('Đã đồng bộ ' + live.moves.length + ' nửa nước từ ' + siteLabel + '.', 'Synchronized ' + live.moves.length + ' plies from ' + siteLabel + '.')
+      ? t('Đã đồng bộ ' + live.moves.length + ' nửa nước · nguồn ' + live.source, 'Synchronized ' + live.moves.length + ' plies · source ' + live.source)
       : t('Chưa có dữ liệu move list. OPMAS sẽ chờ sự kiện DOM tiếp theo.', 'No move-list data yet. OPMAS is waiting for the next DOM event.');
 
     // Replay the actual game moves onto OPMAS's own board.
@@ -460,16 +460,29 @@ function renderLiveDetector(host: HTMLElement): void {
     result.append(card);
   }
 
-  // Observe move-list DOM changes, debounce bursts, and retain a short fallback for SPA-rendered updates.
+  // Observe the page and all currently-open shadow roots. Re-scan after
+  // DOM changes so newly-mounted web components are attached automatically.
   let updateQueued = false;
+  const observerOptions: MutationObserverInit = { childList: true, subtree: true, characterData: true };
+  function attachLiveObservers(): void {
+    for (const root of getLiveSearchRoots(document)) {
+      const target: Node = root === document ? document.documentElement : root;
+      if (target) liveObserver?.observe(target, observerOptions);
+    }
+  }
   liveObserver = new MutationObserver(() => {
     if (updateQueued) return;
     updateQueued = true;
-    window.setTimeout(() => { updateQueued = false; update(); }, 90);
+    window.setTimeout(() => {
+      updateQueued = false;
+      attachLiveObservers();
+      update();
+    }, 90);
   });
-  if (document.body) liveObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+  attachLiveObservers();
   update();
-  liveRefreshTimer = window.setInterval(update, 1200);
+  // Fallback also catches site changes that do not mutate an observed open root.
+  liveRefreshTimer = window.setInterval(update, 900);
 }
 function renderContent(): void {
   content.replaceChildren(makeTabs());
