@@ -388,7 +388,12 @@ function renderLiveDetector(host: HTMLElement): void {
     details.replaceChildren();
     if (!live.moves.length) return;
 
-    const detection = detectOpening(db, live.moves);
+    let detection: ReturnType<typeof detectOpening>;
+    try { detection = detectOpening(db, live.moves); }
+    catch {
+      status.textContent = t('Move list đang cập nhật dở; OPMAS sẽ thử lại khi có nước đi mới.', 'The move list is mid-update; OPMAS will retry after the next move event.');
+      return;
+    }
     if (!detection) {
       result.append(el('div', t('Chưa khớp khai cuộc trong thư viện OPMAS.', 'No matching opening found in the OPMAS library.'), 'padding:12px;border:1px solid #f1dfb9;border-radius:10px;background:#fffaf0;color:' + palette.amber + ';font-size:12px'));
       return;
@@ -492,6 +497,10 @@ let mountObserverStarted = false;
 const mountObserver = new MutationObserver(() => ensureMounted());
 function bootMount(): void {
   ensureMounted();
+  if (parseGameUrl(location.href)?.site === 'lichess') {
+    panel.style.display = 'block';
+    void render();
+  }
   if (document.documentElement && !mountObserverStarted) {
     mountObserverStarted = true;
     mountObserver.observe(document.documentElement, { childList: true, subtree: true });
@@ -513,6 +522,7 @@ window.setInterval(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     stopLiveMonitor();
+    if (parseGameUrl(location.href)?.site === 'lichess') panel.style.display = 'block';
     if (panel.style.display !== 'none') void render();
   }
 }, 1200);
