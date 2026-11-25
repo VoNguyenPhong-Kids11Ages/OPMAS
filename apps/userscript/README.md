@@ -4,7 +4,7 @@ Tampermonkey userscript for Chess.com and Lichess, built with Vite and `vite-plu
 
 ## Features
 
-- Pixel-style OPMAS knight identity and floating launcher.
+- Pixel-style OPMAS knight identity and floating launcher mounted in an isolated Shadow DOM, with automatic remount if the host page replaces its DOM.
 - Tampermonkey commands: Open Explorer, Analyze PGN, Saved openings, Close GUI.
 - Opening Explorer searches ECO, opening names, and move strings across the bundled database.
 - ECO family filter (A–E), opening detail view, copy moves/ECO actions.
