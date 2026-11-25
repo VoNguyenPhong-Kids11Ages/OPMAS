@@ -335,20 +335,25 @@ function renderLiveDetector(host: HTMLElement): void {
   const banner = el('div', '', 'padding:11px 12px;border:1px solid #b8d7fb;border-radius:11px;background:#eff6ff;color:#174b83;font-size:12px;line-height:1.55');
   banner.append(
     el('div', '● LIVE · READ-ONLY', 'font-size:11px;font-weight:900;letter-spacing:.7px;color:#1769d2'),
-    el('div', t('Đang đọc lịch sử nước đi hiển thị trên ', 'Reading the visible move list on ') + siteLabel + t('. Chỉ nhận diện khai cuộc, không gợi ý nước đi.', '. Opening identification only; no move suggestions.')),
+    el('div', t('Đang đồng bộ ván cờ từ ' + siteLabel + '. Bàn cờ OPMAS cập nhật theo sự kiện nước đi; chỉ nhận diện khai cuộc.', 'Synchronizing the game from ' + siteLabel + '. OPMAS board updates on move events; opening identification only.')),
   );
-  const status = el('div', t('Đang chờ dữ liệu nước đi…', 'Waiting for move-list data…'), style.muted);
+  const status = el('div', t('Đang chờ dữ liệu nước đi…', 'Waiting for move data…'), style.muted);
   const result = el('div');
+  const boardHost = el('div');
+  const boardCaption = el('div', t('Bàn cờ đồng bộ', 'Synchronized board'), 'font-size:12px;font-weight:850;margin:12px 0 4px;color:#31445e');
+  const boardMeta = el('div', t('Chưa có vị trí ván cờ.', 'No game position yet.'), style.muted);
   const moveLine = el('pre', '', 'white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:9px;background:#f5f8fc;color:#31445e;font:12px/1.7 ui-monospace,SFMono-Regular,monospace');
   const refresh = actionButton(t('Làm mới', 'Refresh'), () => update(), true);
   const details = el('div');
   host.append(
-    makeSectionTitle(t('Live Opening Detector', 'Live Opening Detector'), t('Theo dõi tên khai cuộc và biến thể từ move list của bàn cờ được hỗ trợ.', 'Identify the opening and variation from the supported board move list.')),
-    banner, status, result, el('div', t('Lịch sử nước đi đọc được', 'Detected move history'), 'font-size:12px;font-weight:800;margin:12px 0 5px;color:#31445e'),
+    makeSectionTitle(t('Live Opening Detector', 'Live Opening Detector'), t('Tự lấy ván từ URL Lichess, đưa vị trí hiện tại lên bàn OPMAS và theo dõi biến thể theo từng nước.', 'Reads the Lichess game from its URL, mirrors the current position on the OPMAS board, and tracks the opening move by move.')),
+    banner, status, result, boardCaption, boardHost, boardMeta,
+    el('div', t('Lịch sử nước đi đọc được', 'Detected move history'), 'font-size:12px;font-weight:800;margin:12px 0 5px;color:#31445e'),
     moveLine, refresh, details,
   );
 
   let lastSignature = '';
+  let lastFen = START_FEN;
   function update(): void {
     if (panel.style.display === 'none') return;
     const live = readLiveMoves(document, location.href);
@@ -359,30 +364,52 @@ function renderLiveDetector(host: HTMLElement): void {
     const signature = live.moves.join(' ');
     if (signature === lastSignature) return;
     lastSignature = signature;
-    moveLine.textContent = signature || t('Chưa đọc được nước đi. Mở move list hoặc đợi trang tải xong.', 'No moves detected yet. Open the move list or wait for the page to load.');
+    moveLine.textContent = signature || t('Chưa đọc được nước đi. Mở move list hoặc đợi trang tải xong.', 'No moves detected yet. OPMAS will retry automatically.');
     status.textContent = live.moves.length
-      ? t(`Đã đọc ${live.moves.length} nửa nước · cập nhật tự động`, `Read ${live.moves.length} plies · auto-updating`)
-      : t('Chưa có dữ liệu move list. OPMAS sẽ thử lại tự động.', 'No move-list data yet. OPMAS will retry automatically.');
+      ? t('Đã đồng bộ ' + live.moves.length + ' nửa nước từ ' + siteLabel + '.', 'Synchronized ' + live.moves.length + ' plies from ' + siteLabel + '.')
+      : t('Chưa có dữ liệu move list. OPMAS sẽ chờ sự kiện DOM tiếp theo.', 'No move-list data yet. OPMAS is waiting for the next DOM event.');
+
+    // Replay the actual game moves onto OPMAS's own board.
+    try {
+      const frames = replay(live.moves);
+      const latest = frames[frames.length - 1];
+      if (latest?.fen) {
+        lastFen = latest.fen;
+        renderBoard(lastFen, boardHost);
+        boardMeta.textContent = t('Vị trí hiện tại · ' + live.moves.length + ' nửa nước · lượt ' + (live.moves.length % 2 === 0 ? 'Trắng' : 'Đen'), 'Current position · ' + live.moves.length + ' plies · ' + (live.moves.length % 2 === 0 ? 'White' : 'Black') + ' to move');
+      } else {
+        renderBoard(lastFen, boardHost);
+      }
+    } catch {
+      boardMeta.textContent = t('Đã đọc nước đi nhưng chưa dựng được vị trí bàn cờ (có thể SAN chưa đầy đủ).', 'Moves were read, but the board position could not be replayed (SAN may be incomplete).');
+    }
+
     result.replaceChildren();
     details.replaceChildren();
     if (!live.moves.length) return;
 
     const detection = detectOpening(db, live.moves);
     if (!detection) {
-      result.append(el('div', t('Chưa khớp khai cuộc trong thư viện OPMAS.', 'No matching opening found in the OPMAS library.'), `padding:12px;border:1px solid #f1dfb9;border-radius:10px;background:#fffaf0;color:${palette.amber};font-size:12px`));
+      result.append(el('div', t('Chưa khớp khai cuộc trong thư viện OPMAS.', 'No matching opening found in the OPMAS library.'), 'padding:12px;border:1px solid #f1dfb9;border-radius:10px;background:#fffaf0;color:' + palette.amber + ';font-size:12px'));
       return;
     }
     const card = el('article', '', style.card);
+    const afterTheory = live.moves.slice(detection.ply);
+    const openingFinished = detection.ply >= detection.opening.ply && live.moves.length > detection.opening.ply;
     card.append(
       el('div', detection.opening.name, 'font-size:16px;font-weight:900;color:#17243a'),
-      el('div', `ECO ${detection.opening.eco} · ${detection.opening.ply} ${t('nửa nước trong dòng lý thuyết', 'theory plies')}`, 'margin-top:4px;color:#1769d2;font-size:12px;font-weight:800'),
+      el('div', 'ECO ' + detection.opening.eco + ' · ' + detection.opening.ply + ' ' + t('nửa nước lý thuyết', 'theory plies'), 'margin-top:4px;color:#1769d2;font-size:12px;font-weight:800'),
       el('p', detection.exact
         ? t('Khớp chính xác với dòng khai cuộc trong cơ sở dữ liệu.', 'Exact match with a line in the opening database.')
-        : t('Đây là vị trí khớp sâu nhất tìm được; ván có thể đã đi vào biến phụ hoặc chuyển vị.', 'Deepest matching position found; the game may have entered a side variation or transposition.'), style.muted),
+        : t('Đây là vị trí khớp sâu nhất tìm được; ván có thể đã chuyển sang biến phụ hoặc chuyển vị.', 'Deepest matching position found; the game may have entered a side variation or transposition.'), style.muted),
     );
-    const afterTheory = live.moves.slice(detection.ply);
+    if (openingFinished) {
+      card.append(el('div', '✓ ' + t('ĐÃ HOÀN THÀNH PHẦN KHAI CUỘC', 'OPENING PHASE COMPLETED'), 'padding:10px;margin:9px 0;border:1px solid #a7dfc8;border-radius:9px;background:#edfaf4;color:#08734f;font-size:12px;font-weight:900;letter-spacing:.3px'));
+    } else {
+      card.append(el('div', t('Đang trong phần khai cuộc…', 'Opening phase in progress…'), 'padding:9px;margin:9px 0;border-radius:8px;background:#f5f8fc;color:#53657c;font-size:12px;font-weight:750'));
+    }
     card.append(el('div', afterTheory.length
-      ? t(`Sau đoạn lý thuyết: ${afterTheory.join(' ')}`, `Moves after the matched theory: ${afterTheory.join(' ')}`)
+      ? t('Sau đoạn lý thuyết đã khớp: ' + afterTheory.join(' '), 'Moves after matched theory: ' + afterTheory.join(' '))
       : t('Chưa có nước đi vượt khỏi đoạn lý thuyết được nhận diện.', 'No moves beyond the detected theory line yet.'), 'padding:9px;border-radius:8px;background:#f5f8fc;color:#31445e;font-size:11px;line-height:1.6'));
     card.append(actionButton(t('Lưu khai cuộc', 'Save opening'), () => {
       const favorites = getFavorites();
@@ -393,12 +420,13 @@ function renderLiveDetector(host: HTMLElement): void {
     }));
     result.append(card);
   }
+
+  // MutationObserver is the primary event-driven source; the interval is a slow fallback.
   update();
   liveObserver = new MutationObserver(() => update());
-  if (document.body) liveObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-  liveRefreshTimer = window.setInterval(update, 1400);
+  if (document.body) liveObserver.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
+  liveRefreshTimer = window.setInterval(update, 2500);
 }
-
 function renderContent(): void {
   content.replaceChildren(makeTabs());
   if (liveMode) {
