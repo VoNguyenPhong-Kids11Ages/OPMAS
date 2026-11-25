@@ -7,7 +7,7 @@ import { replay, START_FEN } from '@opmas/chess-core';
 import { Board } from '@opmas/ui-components';
 
 const db = new OpeningDatabase(openings as Opening[]);
-const API_BASE = import.meta.env.VITE_OPMAS_API_URL?.replace(/\/$/, '') ?? '';
+const API_BASE = (import.meta as ImportMeta & { env: { VITE_OPMAS_API_URL?: string } }).env.VITE_OPMAS_API_URL?.replace(/\/$/, '') ?? '';
 type Route = 'explorer' | 'analyzer' | 'about';
 
 function useRoute(): Route {
