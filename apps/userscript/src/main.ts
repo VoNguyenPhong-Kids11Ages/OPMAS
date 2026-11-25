@@ -8,6 +8,7 @@ import { checkGate } from '@opmas/safety-gate';
 import { fetchStatus } from '@opmas/integrations';
 import { parseGameUrl, isPlayContext } from '@opmas/safety-gate';
 import { readLiveMoves } from './live-board';
+import { CHESSNUT_PIECES } from './chessnut-pieces';
 
 const db = new OpeningDatabase(openings as Opening[]);
 const KEYS = { language: 'opmas-language', favorites: 'opmas-favorites-v2', safety: 'opmas-safety-v2' };
@@ -37,6 +38,7 @@ const style = {
 };
 
 function t(vi: string, en: string): string { return tr.code === 'vi' ? vi : en; }
+function isLiveGameContext(): boolean { return !!parseGameUrl(location.href) || isPlayContext(location.href); }
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text = '', css = ''): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   node.textContent = text;
@@ -183,26 +185,44 @@ function makeSectionTitle(title: string, subtitle: string): HTMLElement {
   return wrap;
 }
 
-const pieces: Record<string, string> = {
-  K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
-  k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
-};
+const PIECE_URLS: Record<string, string> = Object.fromEntries(
+  Object.entries(CHESSNUT_PIECES).map(([piece, svg]) => [
+    piece,
+    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+  ]),
+);
+
 function renderBoard(fen: string, host: HTMLElement): void {
-  const board = el('div', '', 'display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:min(100%,300px);aspect-ratio:1;margin:10px auto;border:4px solid #d9e2ed;border-radius:7px;overflow:hidden');
+  const board = el('div', '', 'display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:min(100%,340px);aspect-ratio:1;margin:12px auto;border:5px solid #344d35;border-radius:8px;overflow:hidden;box-shadow:0 9px 24px #17243a24;background:#344d35;isolation:isolate');
+  board.setAttribute('role', 'img');
+  board.setAttribute('aria-label', 'OPMAS chess board');
   const rows = fen.split(' ')[0]?.split('/') ?? [];
-  rows.forEach((row, rank) => {
+  const files = 'abcdefgh';
+  rows.slice(0, 8).forEach((row, rank) => {
     let file = 0;
     for (const char of row) {
-      if (/^[1-8]$/.test(char)) {
-        const emptyCount = Number(char);
-        for (let n = 0; n < emptyCount; n++, file++) {
-          const square = el('div', '', `display:grid;place-items:center;background:${(rank + file) % 2 === 0 ? '#edf2f7' : '#9bb4cf'};font-size:clamp(16px,5vw,29px)`);
-          board.append(square);
+      const count = /^[1-8]$/.test(char) ? Number(char) : 1;
+      for (let n = 0; n < count && file < 8; n++, file++) {
+        const light = (rank + file) % 2 === 0;
+        const square = el('div', '', `position:relative;display:grid;place-items:center;min-width:0;aspect-ratio:1;background:${light ? '#eeeed2' : '#769656'};overflow:hidden`);
+        if (!/^[1-8]$/.test(char) && n === 0) {
+          const image = el('img') as HTMLImageElement;
+          image.src = PIECE_URLS[char] ?? '';
+          image.alt = char;
+          image.draggable = false;
+          image.decoding = 'async';
+          image.style.cssText = 'display:block;width:91%;height:91%;object-fit:contain;filter:drop-shadow(0 1px 1px #17243a35);pointer-events:none;user-select:none';
+          square.append(image);
         }
-      } else {
-        const square = el('div', pieces[char] ?? '', `display:grid;place-items:center;background:${(rank + file) % 2 === 0 ? '#edf2f7' : '#9bb4cf'};font-size:clamp(16px,5vw,29px);line-height:1;color:${char === char.toUpperCase() ? '#fff' : '#17243a'};text-shadow:${char === char.toUpperCase() ? '0 1px 2px #17243a,1px 0 1px #17243a' : 'none'}`);
+        if (file === 0) {
+          const rankLabel = el('span', String(8 - rank), `position:absolute;top:2px;left:3px;font:700 9px/1 system-ui;color:${light ? '#769656' : '#eeeed2'};opacity:.9;pointer-events:none`);
+          square.append(rankLabel);
+        }
+        if (rank === 7) {
+          const fileLabel = el('span', files[file] ?? '', `position:absolute;right:3px;bottom:2px;font:700 9px/1 system-ui;color:${light ? '#769656' : '#eeeed2'};opacity:.9;pointer-events:none`);
+          square.append(fileLabel);
+        }
         board.append(square);
-        file++;
       }
     }
   });
@@ -346,7 +366,7 @@ function renderLiveDetector(host: HTMLElement): void {
   const refresh = actionButton(t('Làm mới', 'Refresh'), () => update(), true);
   const details = el('div');
   host.append(
-    makeSectionTitle(t('Live Opening Detector', 'Live Opening Detector'), t('Tự lấy ván từ URL Lichess, đưa vị trí hiện tại lên bàn OPMAS và theo dõi biến thể theo từng nước.', 'Reads the Lichess game from its URL, mirrors the current position on the OPMAS board, and tracks the opening move by move.')),
+    makeSectionTitle(t('Live Opening Detector', 'Live Opening Detector'), t('Tự đọc danh sách nước đi hiển thị trên Lichess/Chess.com, đồng bộ vị trí và nhận diện biến thể theo từng nước.', 'Reads the visible move list on Lichess/Chess.com, mirrors the position, and identifies opening variations move by move.')),
     banner, status, result, boardCaption, boardHost, boardMeta,
     el('div', t('Lịch sử nước đi đọc được', 'Detected move history'), 'font-size:12px;font-weight:800;margin:12px 0 5px;color:#31445e'),
     moveLine, refresh, details,
@@ -362,8 +382,7 @@ function renderLiveDetector(host: HTMLElement): void {
       return;
     }
     const signature = live.moves.join(' ');
-    if (signature === lastSignature) return;
-    lastSignature = signature;
+    if (signature === lastSignature && live.moves.length > 0) return;
     moveLine.textContent = signature || t('Chưa đọc được nước đi. Mở move list hoặc đợi trang tải xong.', 'No moves detected yet. OPMAS will retry automatically.');
     status.textContent = live.moves.length
       ? t('Đã đồng bộ ' + live.moves.length + ' nửa nước từ ' + siteLabel + '.', 'Synchronized ' + live.moves.length + ' plies from ' + siteLabel + '.')
@@ -381,12 +400,17 @@ function renderLiveDetector(host: HTMLElement): void {
         renderBoard(lastFen, boardHost);
       }
     } catch {
-      boardMeta.textContent = t('Đã đọc nước đi nhưng chưa dựng được vị trí bàn cờ (có thể SAN chưa đầy đủ).', 'Moves were read, but the board position could not be replayed (SAN may be incomplete).');
+      boardMeta.textContent = t('Move list đang tải hoặc có SAN chưa hoàn chỉnh; OPMAS sẽ tự thử lại.', 'The move list is loading or contains incomplete SAN; OPMAS will retry automatically.');
+      status.textContent = t('Đang chờ danh sách nước đi ổn định…', 'Waiting for a stable move list…');
+      return;
     }
 
     result.replaceChildren();
     details.replaceChildren();
-    if (!live.moves.length) return;
+    if (!live.moves.length) {
+      boardMeta.textContent = t('Đang chờ nước đi đầu tiên…', 'Waiting for the first move…');
+      return;
+    }
 
     let detection: ReturnType<typeof detectOpening>;
     try { detection = detectOpening(db, live.moves); }
@@ -394,6 +418,7 @@ function renderLiveDetector(host: HTMLElement): void {
       status.textContent = t('Move list đang cập nhật dở; OPMAS sẽ thử lại khi có nước đi mới.', 'The move list is mid-update; OPMAS will retry after the next move event.');
       return;
     }
+    lastSignature = signature;
     if (!detection) {
       result.append(el('div', t('Chưa khớp khai cuộc trong thư viện OPMAS.', 'No matching opening found in the OPMAS library.'), 'padding:12px;border:1px solid #f1dfb9;border-radius:10px;background:#fffaf0;color:' + palette.amber + ';font-size:12px'));
       return;
@@ -427,11 +452,16 @@ function renderLiveDetector(host: HTMLElement): void {
     result.append(card);
   }
 
-  // MutationObserver is the primary event-driven source; the interval is a slow fallback.
+  // Observe move-list DOM changes, debounce bursts, and retain a short fallback for SPA-rendered updates.
+  let updateQueued = false;
+  liveObserver = new MutationObserver(() => {
+    if (updateQueued) return;
+    updateQueued = true;
+    window.setTimeout(() => { updateQueued = false; update(); }, 90);
+  });
+  if (document.body) liveObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
   update();
-  liveObserver = new MutationObserver(() => update());
-  if (document.body) liveObserver.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
-  liveRefreshTimer = window.setInterval(update, 2500);
+  liveRefreshTimer = window.setInterval(update, 1200);
 }
 function renderContent(): void {
   content.replaceChildren(makeTabs());
@@ -455,7 +485,7 @@ function renderContent(): void {
 async function render(focus: 'search' | 'pgn' | null = null): Promise<void> {
   const token = ++renderToken;
   panel.replaceChildren(makeHeader(), notice, content);
-  const isSupportedGame = !!parseGameUrl(location.href) || isPlayContext(location.href);
+  const isSupportedGame = isLiveGameContext();
   const gate = isSupportedGame ? { allowed: false as const, reason: 'game-in-progress' as const } : await checkGate(location.href, fetchStatus);
   if (token !== renderToken) return;
   liveMode = isSupportedGame;
@@ -497,7 +527,7 @@ let mountObserverStarted = false;
 const mountObserver = new MutationObserver(() => ensureMounted());
 function bootMount(): void {
   ensureMounted();
-  if (parseGameUrl(location.href)?.site === 'lichess') {
+  if (isLiveGameContext()) {
     panel.style.display = 'block';
     void render();
   }
@@ -522,7 +552,7 @@ window.setInterval(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     stopLiveMonitor();
-    if (parseGameUrl(location.href)?.site === 'lichess') panel.style.display = 'block';
+    if (isLiveGameContext()) panel.style.display = 'block';
     if (panel.style.display !== 'none') void render();
   }
 }, 1200);
