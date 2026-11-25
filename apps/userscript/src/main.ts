@@ -396,6 +396,7 @@ function renderLiveDetector(host: HTMLElement): void {
     const card = el('article', '', style.card);
     const afterTheory = live.moves.slice(detection.ply);
     const openingFinished = detection.ply >= detection.opening.ply && live.moves.length > detection.opening.ply;
+    if (openingFinished) boardMeta.textContent = t('✓ ĐÃ HOÀN THÀNH PHẦN KHAI CUỘC · vị trí hiện tại vẫn được đồng bộ', '✓ OPENING PHASE COMPLETED · board position remains synchronized');
     card.append(
       el('div', detection.opening.name, 'font-size:16px;font-weight:900;color:#17243a'),
       el('div', 'ECO ' + detection.opening.eco + ' · ' + detection.opening.ply + ' ' + t('nửa nước lý thuyết', 'theory plies'), 'margin-top:4px;color:#1769d2;font-size:12px;font-weight:800'),
