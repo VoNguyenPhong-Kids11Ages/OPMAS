@@ -20,7 +20,7 @@ export function parseSanTokens(text: string): string[] {
   for (let token of tokens) {
     token = token.trim().replace(/^\d+\.{1,3}/, '').replace(/[!?]+$/g, '');
     token = token.replace(/^[,;]+|[,;]+$/g, '');
-    if (SAN.test(token)) moves.push(token.replace(/^0-0-0$/, 'O-O-O').replace(/^0-0$/, 'O-O'));
+    if (SAN.test(token)) moves.push(token.replace(/^0-0(-0)?([+#]?)$/, 'O-O$1$2'));
   }
   return moves;
 }
@@ -51,11 +51,11 @@ const SELECTORS: Record<LiveSite, string[]> = {
   ],
 };
 
-type SearchRoot = Document | ShadowRoot;
+export type LiveSearchRoot = Document | ShadowRoot;
 
 /** Query open shadow roots as well as the page DOM (web-component move lists use shadow DOM). */
-function collectSearchRoots(doc: Document): SearchRoot[] {
-  const roots: SearchRoot[] = [doc];
+export function getLiveSearchRoots(doc: Document): LiveSearchRoot[] {
+  const roots: LiveSearchRoot[] = [doc];
   const visited = new Set<ShadowRoot>();
   for (let index = 0; index < roots.length; index++) {
     const root = roots[index]!;
@@ -91,7 +91,7 @@ export function readLiveMoves(doc: Document, href: string): LiveMoves | null {
 
   let best: { moves: string[]; source: string } = { moves: [], source: '' };
   const seen = new Set<string>();
-  const roots = collectSearchRoots(doc);
+  const roots = getLiveSearchRoots(doc);
 
   for (const selector of SELECTORS[site]) {
     const nodes = roots.flatMap((root) => Array.from(root.querySelectorAll<HTMLElement>(selector)));
