@@ -161,13 +161,12 @@ function Explorer() {
 
 function Analyzer() {
   const [pgn, setPgn] = useState('');
-  const [error, setError] = useState('');
   const parsed = useMemo(() => parsePgn(pgn), [pgn]);
-  const detection = useMemo(() => pgn.trim() ? detectOpening(db, parsed.moves, parsed.headers['FEN']) : null, [pgn, parsed.moves]);
+  const detection = useMemo(() => pgn.trim() ? detectOpening(db, parsed.moves, parsed.headers['FEN']) : null, [pgn, parsed.moves, parsed.headers['FEN']]);
   const positions = useMemo(() => {
     try { return [parsed.headers['FEN'] ?? START_FEN, ...replay(parsed.moves, parsed.headers['FEN']).map((move) => move.fen)]; }
     catch { return [START_FEN]; }
-  }, [parsed.moves]);
+  }, [parsed.moves, parsed.headers['FEN']]);
   const [ply, setPly] = useState(0);
   useEffect(() => setPly(0), [pgn]);
   const validReplay = positions.length === parsed.moves.length + 1;
@@ -179,7 +178,6 @@ function Analyzer() {
         <div className="panel analyzer-input"><div className="panel-heading"><div><span className="panel-kicker">INPUT</span><h2>PGN notation</h2></div></div>
           <textarea value={pgn} onChange={(event) => setPgn(event.target.value)} placeholder={'[Event "Casual game"]\n[Result "*"]\n\n1. e4 e5 2. Nf3 Nc6'} rows={12} aria-label="PGN input" />
           <div className="input-footer"><span>{parsed.moves.length} nước đi đã nhận diện</span><button className="text-button" onClick={() => setPgn('')}>Xóa nội dung</button></div>
-          {error && <p className="error-copy">{error}</p>}
           {pgn.trim() && <div className="detection-result">{detection ? <><span className="success-icon">✓</span><div><small>OPENING DETECTED</small><strong>{detection.opening.eco} · {detection.opening.name}</strong><p>{detection.opening.pgn}</p></div></> : <><span className="neutral-icon">i</span><div><small>NO MATCH</small><strong>Chưa nhận diện được khai cuộc</strong><p>Thử PGN khác hoặc kiểm tra định dạng nước đi.</p></div></>}</div>}
         </div>
         <div className="panel analyzer-board"><div className="panel-heading"><div><span className="panel-kicker">REPLAY</span><h2>Ván cờ</h2></div><span className="move-counter">{ply} / {parsed.moves.length}</span></div>
