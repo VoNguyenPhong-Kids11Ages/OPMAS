@@ -9,18 +9,74 @@ import { fetchStatus } from '@opmas/integrations';
 const db = new OpeningDatabase(openings as Opening[]);
 const LANG_KEY = 'opmas-language';
 const SAFETY_KEY = 'opmas-safety-v1';
+const FAV_KEY = 'opmas-favorites-v1';
 let tr = createTranslator(localStorage.getItem(LANG_KEY) ?? 'en');
+let activeTab: 'explorer' | 'analyzer' | 'favorites' = 'explorer';
+let selectedEco: string | null = null;
+let focusAfterRender: 'search' | 'pgn' | null = null;
+let gateAllowed = false;
 
 type MenuRegistrar = (caption: string, callback: () => void) => number;
 const registerMenu = (globalThis as typeof globalThis & {
   GM_registerMenuCommand?: MenuRegistrar;
 }).GM_registerMenuCommand;
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, text = '', css = ''): HTMLElementTagNameMap[K] {
-  const e = document.createElement(tag);
-  e.textContent = text;
-  if (css) e.style.cssText = css;
-  return e;
+const css = {
+  input: 'box-sizing:border-box;width:100%;padding:10px;margin:7px 0;background:#08162d;color:#f4f7ff;border:1px solid #345477;border-radius:8px;outline:none',
+  button: 'padding:8px 10px;background:#19385d;color:#eaf5ff;border:1px solid #365b82;border-radius:8px;font-weight:650;cursor:pointer',
+  primary: 'padding:9px 12px;background:#087dbb;color:white;border:1px solid #28b9ed;border-radius:8px;font-weight:750;cursor:pointer',
+  muted: 'font-size:12px;color:#9bb3d1;line-height:1.5',
+  card: 'padding:10px;margin:7px 0;background:#132945;border:1px solid #294969;border-radius:9px',
+};
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, text = '', style = ''): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  node.textContent = text;
+  if (style) node.style.cssText = style;
+  return node;
+}
+
+function button(label: string, action: () => void, primary = false): HTMLButtonElement {
+  const node = el('button', label, primary ? css.primary : css.button);
+  node.type = 'button';
+  node.onclick = action;
+  return node;
+}
+
+function getFavorites(): string[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]');
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function isFavorite(eco: string): boolean {
+  return getFavorites().includes(eco);
+}
+
+function toggleFavorite(eco: string): void {
+  const favorites = getFavorites();
+  const next = favorites.includes(eco) ? favorites.filter((item) => item !== eco) : [...favorites, eco];
+  localStorage.setItem(FAV_KEY, JSON.stringify(next));
+  renderContent();
+}
+
+async function copyText(value: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(value);
+    setNotice('Copied to clipboard ✓');
+  } catch {
+    const temp = el('textarea');
+    temp.value = value;
+    temp.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.append(temp);
+    temp.select();
+    const copied = document.execCommand('copy');
+    temp.remove();
+    setNotice(copied ? 'Copied to clipboard ✓' : 'Clipboard unavailable in this page.');
+  }
 }
 
 function confirmSafety(): boolean {
@@ -33,102 +89,206 @@ function confirmSafety(): boolean {
   return true;
 }
 
-const panel = el('section', '', 'position:fixed;right:18px;top:90px;width:min(360px,calc(100vw - 36px));max-height:78vh;overflow:auto;z-index:2147483647;background:#101a30;color:#f4f7ff;border:1px solid #2563a8;border-radius:14px;padding:14px;font:14px system-ui,sans-serif;box-shadow:0 12px 40px #0009;display:none');
-const toggle = el('button', '♞ OPMAS', 'position:fixed;right:18px;bottom:20px;z-index:2147483646;border:1px solid #55c8f5;background:#102b55;color:#fff;border-radius:10px;padding:11px 15px;font-weight:800;letter-spacing:.3px;cursor:pointer;box-shadow:0 4px 18px #0008');
-const search = el('input', '', 'box-sizing:border-box;width:100%;padding:9px;margin:8px 0;background:#07152b;color:#fff;border:1px solid #365477;border-radius:8px');
-search.placeholder = 'Search ECO / opening name…';
-const area = el('textarea', '', 'box-sizing:border-box;width:100%;padding:9px;background:#07152b;color:#fff;border:1px solid #365477;border-radius:8px');
-area.rows = 5;
-area.placeholder = 'Paste PGN here…';
-const out = el('div', '', 'margin-top:10px;line-height:1.5');
-const status = el('p', '', 'font-size:12px;color:#9bb3d1');
+const panel = el('section', '', 'position:fixed;right:16px;top:76px;width:min(390px,calc(100vw - 24px));max-height:82vh;overflow:auto;z-index:2147483647;box-sizing:border-box;background:#0d192c;color:#f4f7ff;border:1px solid #2876a8;border-radius:15px;padding:13px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 14px 48px #000b;display:none');
+const launcher = el('button', '♞ OPMAS', 'position:fixed;right:18px;bottom:20px;z-index:2147483646;border:1px solid #55c8f5;background:#102b55;color:#fff;border-radius:11px;padding:11px 15px;font-weight:850;letter-spacing:.4px;cursor:pointer;box-shadow:0 4px 20px #0009');
+const content = el('div');
+const notice = el('p', '', 'min-height:18px;margin:7px 2px;color:#71d9ff;font-size:12px');
+const searchInput = el('input', '', css.input);
+searchInput.placeholder = 'Search name, ECO, or moves…';
+searchInput.type = 'search';
+const pgnInput = el('textarea', '', css.input);
+pgnInput.rows = 7;
+pgnInput.placeholder = 'Paste a PGN here…';
+const ecoFilter = el('select', '', css.input);
+const langSelect = el('select', '', 'max-width:105px;background:#172b49;color:white;border:1px solid #365477;border-radius:7px;padding:6px');
 
-let focusAfterRender: 'search' | 'pgn' | null = null;
-function showPanel(focus: 'search' | 'pgn' | null = null): void {
+function setNotice(message: string): void {
+  notice.textContent = message;
+  window.setTimeout(() => {
+    if (notice.textContent === message) notice.textContent = '';
+  }, 2600);
+}
+
+function openPanel(tab: typeof activeTab = 'explorer', focus: 'search' | 'pgn' | null = null): void {
   if (!confirmSafety()) return;
+  activeTab = tab;
   focusAfterRender = focus;
   panel.style.display = 'block';
+  void render();
 }
-function hidePanel(): void { panel.style.display = 'none'; }
+function closePanel(): void { panel.style.display = 'none'; }
 
-async function refreshGate(): Promise<boolean> {
-  const gate = await checkGate(location.href, fetchStatus);
-  if (!gate.allowed) {
-    out.replaceChildren(el('p', tr.t('blocked')));
-    return false;
-  }
-  return true;
-}
-
-function analyzePgn(): void {
-  out.replaceChildren();
-  const parsed = parsePgn(area.value);
-  const result = detectOpening(db, parsed.moves);
-  if (!result) {
-    out.append(el('p', tr.t('noResult')));
-    return;
-  }
-  out.append(el('b', `${result.opening.eco} · ${result.opening.name}`), el('p', result.opening.pgn));
-}
-
-async function render(): Promise<void> {
-  panel.replaceChildren();
-  const head = el('div', '', 'display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px');
-  const brand = el('strong', '♞ OPMAS', 'font-size:17px;letter-spacing:.5px;color:#72d8ff');
-  const controls = el('div', '', 'display:flex;gap:6px');
-  const select = el('select', '', 'max-width:100px;background:#172b49;color:white;border:1px solid #365477;border-radius:6px;padding:5px');
-  for (const [code, msgs] of Object.entries(LOCALES)) {
-    const option = new Option(msgs.label, code);
+function makeHeader(): HTMLElement {
+  const header = el('div', '', 'display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px');
+  const brand = el('div', '', 'display:flex;align-items:center;gap:8px');
+  const avatar = el('span', '♞', 'display:grid;place-items:center;width:32px;height:32px;background:#102b55;border:1px solid #3dbce9;border-radius:8px;color:#ffd34f;font-size:22px');
+  const title = el('div', 'OPMAS', 'font-size:17px;font-weight:900;letter-spacing:.8px;color:#76ddff');
+  const subtitle = el('div', 'OPENING MASTER', 'font-size:9px;letter-spacing:1.4px;color:#93aeca');
+  const titleWrap = el('div');
+  titleWrap.append(title, subtitle);
+  brand.append(avatar, titleWrap);
+  const right = el('div', '', 'display:flex;align-items:center;gap:6px');
+  langSelect.replaceChildren();
+  for (const [code, messages] of Object.entries(LOCALES)) {
+    const option = new Option(messages.label, code);
     option.selected = code === tr.code;
-    select.add(option);
+    langSelect.add(option);
   }
-  select.onchange = () => {
-    localStorage.setItem(LANG_KEY, select.value);
-    tr = createTranslator(select.value);
+  langSelect.onchange = () => {
+    localStorage.setItem(LANG_KEY, langSelect.value);
+    tr = createTranslator(langSelect.value);
     void render();
   };
-  const close = el('button', '×', 'background:#263b59;color:white;border:0;border-radius:6px;padding:4px 10px;cursor:pointer');
-  close.onclick = hidePanel;
-  controls.append(select, close);
-  head.append(brand, controls);
-  panel.append(head);
+  right.append(langSelect, button('—', () => { panel.style.display = 'none'; }, false), button('×', closePanel));
+  header.append(brand, right);
+  return header;
+}
 
-  if (!await refreshGate()) return;
+function makeTabs(): HTMLElement {
+  const nav = el('div', '', 'display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0');
+  const tabs: Array<[typeof activeTab, string]> = [
+    ['explorer', '♟ Explorer'],
+    ['analyzer', '⌕ PGN'],
+    ['favorites', '★ Saved'],
+  ];
+  for (const [tab, label] of tabs) {
+    const item = button(label, () => { activeTab = tab; renderContent(); });
+    item.style.background = activeTab === tab ? '#087dbb' : '#142943';
+    item.style.borderColor = activeTab === tab ? '#35bff0' : '#294969';
+    nav.append(item);
+  }
+  return nav;
+}
 
-  status.textContent = `Opening database · ${db.size} entries`;
-  const searchLabel = el('label', 'Opening Explorer', 'display:block;font-weight:700;margin-top:8px');
-  const searchResults = el('div');
-  search.oninput = () => {
-    const matches = db.search(search.value, 20);
-    searchResults.replaceChildren();
-    for (const opening of matches) {
-      const item = el('button', `${opening.eco} · ${opening.name}`,
-        'display:block;width:100%;text-align:left;margin:4px 0;padding:8px;background:#172b49;color:#eaf4ff;border:1px solid #29496d;border-radius:7px;cursor:pointer');
-      item.onclick = () => searchResults.replaceChildren(el('b', `${opening.eco} · ${opening.name}`), el('p', opening.pgn));
-      searchResults.append(item);
+function showOpening(opening: Opening, host: HTMLElement): void {
+  selectedEco = opening.eco;
+  const card = el('article', '', css.card);
+  const top = el('div', '', 'display:flex;align-items:flex-start;justify-content:space-between;gap:8px');
+  const name = el('div', '', 'min-width:0');
+  name.append(el('div', opening.name, 'font-weight:800;color:#f4f8ff'), el('div', `ECO ${opening.eco} · ${opening.ply} plies`, css.muted));
+  top.append(name, button(isFavorite(opening.eco) ? '★ Saved' : '☆ Save', () => toggleFavorite(opening.eco)));
+  const moves = el('pre', opening.pgn, 'white-space:pre-wrap;overflow-wrap:anywhere;background:#08162d;padding:9px;border-radius:7px;color:#bfe7ff;font:12px/1.6 ui-monospace,monospace');
+  const actions = el('div', '', 'display:flex;gap:7px;flex-wrap:wrap');
+  actions.append(button('Copy moves', () => void copyText(opening.pgn)), button('Copy ECO', () => void copyText(opening.eco)));
+  card.append(top, moves, actions);
+  host.replaceChildren(card);
+}
+
+function renderExplorer(host: HTMLElement): void {
+  const label = el('label', 'Opening Explorer', 'display:block;font-weight:800;margin:8px 0 3px');
+  const hint = el('p', `Search across ${db.size.toLocaleString()} opening records. Select an entry to inspect its moves.`, css.muted);
+  ecoFilter.replaceChildren(new Option('All ECO codes', ''));
+  for (const letter of ['A', 'B', 'C', 'D', 'E']) ecoFilter.add(new Option(`ECO ${letter}`, letter));
+  ecoFilter.onchange = () => renderExplorer(host);
+  searchInput.oninput = () => renderExplorer(host);
+  const matches = (ecoFilter.value ? db.byEco(ecoFilter.value) : db.search(searchInput.value, 100))
+    .filter((opening) => {
+      if (!searchInput.value.trim()) return true;
+      const q = searchInput.value.trim().toLowerCase();
+      return `${opening.eco} ${opening.name} ${opening.pgn}`.toLowerCase().includes(q);
+    }).slice(0, 40);
+  const list = el('div');
+  const count = el('p', `Showing ${matches.length} result(s) · max 40`, css.muted);
+  for (const opening of matches) {
+    const item = button(`${opening.eco}  ·  ${opening.name}`, () => showOpening(opening, detail));
+    item.style.cssText += ';display:block;width:100%;text-align:left;margin:4px 0;white-space:normal';
+    list.append(item);
+  }
+  const detail = el('div');
+  if (selectedEco) {
+    const selected = db.all().find((opening) => opening.eco === selectedEco);
+    if (selected) showOpening(selected, detail);
+  }
+  host.replaceChildren(label, hint, searchInput, ecoFilter, count, list, detail);
+  if (focusAfterRender === 'search') searchInput.focus();
+}
+
+function renderAnalyzer(host: HTMLElement): void {
+  const heading = el('div', 'PGN Analyzer', 'font-weight:800;margin:8px 0 4px');
+  const help = el('p', 'Paste a completed game PGN to identify its deepest matching opening. OPMAS does not provide live-game move assistance.', css.muted);
+  const actions = el('div', '', 'display:flex;gap:7px;flex-wrap:wrap;margin:7px 0');
+  const result = el('div');
+  const analyze = button('⌕ Analyze PGN', () => {
+    const parsed = parsePgn(pgnInput.value);
+    if (!parsed.moves.length) {
+      result.replaceChildren(el('p', 'No valid SAN moves found. Check the PGN text.', 'color:#ffbd75'));
+      return;
     }
-  };
-  const pgnLabel = el('label', 'PGN Analyzer', 'display:block;font-weight:700;margin-top:14px');
-  const analyze = el('button', 'Analyze PGN', 'margin-top:7px;padding:9px 12px;background:#1676c5;color:white;border:0;border-radius:8px;font-weight:700;cursor:pointer');
-  analyze.onclick = analyzePgn;
-  panel.append(status, searchLabel, search, searchResults, pgnLabel, area, analyze, out);
-  if (focusAfterRender === 'search') search.focus();
-  if (focusAfterRender === 'pgn') area.focus();
+    const detection = detectOpening(db, parsed.moves);
+    if (!detection) {
+      result.replaceChildren(el('p', 'No matching opening position found in the database.', css.muted));
+      return;
+    }
+    const card = el('article', '', css.card);
+    card.append(
+      el('div', `${detection.opening.eco} · ${detection.opening.name}`, 'font-weight:850;color:#7bdcff'),
+      el('p', `Matched at ply ${detection.ply} of ${parsed.moves.length} · ${detection.exact ? 'exact position' : 'deepest earlier match'}`, css.muted),
+      el('p', `Moves parsed: ${parsed.moves.length} · Result: ${parsed.result}`, css.muted),
+      button('Save opening', () => toggleFavorite(detection.opening.eco)),
+    );
+    result.replaceChildren(card);
+  }, true);
+  actions.append(analyze, button('Copy PGN', () => void copyText(pgnInput.value)), button('Clear', () => { pgnInput.value = ''; result.replaceChildren(); }));
+  host.replaceChildren(heading, help, pgnInput, actions, result);
+  if (focusAfterRender === 'pgn') pgnInput.focus();
+}
+
+function renderFavorites(host: HTMLElement): void {
+  const favorites = getFavorites();
+  const heading = el('div', 'Saved openings', 'font-weight:800;margin:8px 0');
+  const list = el('div');
+  for (const eco of favorites) {
+    const opening = db.all().find((item) => item.eco === eco);
+    if (!opening) continue;
+    const item = button(`★ ${opening.eco} · ${opening.name}`, () => showOpening(opening, detail));
+    item.style.cssText += ';display:block;width:100%;text-align:left;margin:5px 0;white-space:normal';
+    list.append(item);
+  }
+  const detail = el('div');
+  if (!favorites.length) list.append(el('p', 'No saved openings yet. Use ☆ Save in Explorer.', css.muted));
+  const clear = button('Clear saved list', () => {
+    if (confirm('Remove all saved OPMAS openings?')) {
+      localStorage.removeItem(FAV_KEY);
+      renderContent();
+    }
+  });
+  host.replaceChildren(heading, list, detail, clear);
+}
+
+function renderContent(): void {
+  content.replaceChildren(makeTabs());
+  if (!gateAllowed) {
+    content.append(el('p', tr.t('blocked'), 'padding:12px;background:#3b2630;border-radius:8px;color:#ffd4d4'));
+    return;
+  }
+  const view = el('div');
+  content.append(view);
+  if (activeTab === 'explorer') renderExplorer(view);
+  else if (activeTab === 'analyzer') renderAnalyzer(view);
+  else renderFavorites(view);
   focusAfterRender = null;
 }
 
-toggle.onclick = () => {
-  if (panel.style.display !== 'none') return hidePanel();
-  showPanel();
-  void render();
+async function render(): Promise<void> {
+  panel.replaceChildren(makeHeader(), notice, content);
+  const gate = await checkGate(location.href, fetchStatus);
+  gateAllowed = gate.allowed;
+  const status = el('p', `Database: ${db.size.toLocaleString()} openings · ${gateAllowed ? 'Ready' : 'Restricted on active game pages'}`, css.muted);
+  panel.insertBefore(status, content);
+  renderContent();
+}
+
+launcher.onclick = () => {
+  if (panel.style.display !== 'none') return closePanel();
+  openPanel();
 };
-document.body.append(panel, toggle);
+document.body.append(panel, launcher);
 
 if (registerMenu) {
-  registerMenu('♞ OPMAS — Open GUI', () => { showPanel(); void render(); });
-  registerMenu('OPMAS — Search openings', () => { showPanel('search'); void render(); });
-  registerMenu('OPMAS — Analyze PGN', () => { showPanel('pgn'); void render(); });
-  registerMenu('OPMAS — Close GUI', hidePanel);
+  registerMenu('♞ OPMAS — Open Explorer', () => openPanel('explorer', 'search'));
+  registerMenu('OPMAS — Analyze PGN', () => openPanel('analyzer', 'pgn'));
+  registerMenu('OPMAS — Saved openings', () => openPanel('favorites'));
+  registerMenu('OPMAS — Close GUI', closePanel);
 }
 
 let lastUrl = location.href;
