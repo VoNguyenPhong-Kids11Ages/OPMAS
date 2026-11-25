@@ -4,7 +4,7 @@ OPMAS is a study-first chess opening companion for Chess.com and Lichess, built 
 
 ## Features
 
-- Light, responsive floating interface isolated in Shadow DOM, with a responsive green board and bundled Chessnut SVG pieces.
+- Light, responsive floating interface isolated in Shadow DOM, with a responsive green board, bundled Chessnut SVG pieces, and last-move highlighting.
 - Opening Explorer for the bundled opening database: search by ECO, name, or moves; filter ECO families; progressively load results.
 - Interactive board replay for opening main lines, with start/previous/next/end controls.
 - PGN Analyzer identifies the deepest matching opening position and reports the matched ply and game result.
@@ -12,15 +12,15 @@ OPMAS is a study-first chess opening companion for Chess.com and Lichess, built 
 - Vietnamese-first interface with the shared language selector.
 - Tampermonkey menu commands and keyboard Escape to close.
 - Defensive mount recovery for pages that replace their DOM.
-- Live board mirroring on supported Lichess and Chess.com game/play routes: reads the visible move list, replays the current game position on the OPMAS board, and updates on DOM changes with a debounced observer plus a short fallback poll.
+- Live board mirroring on supported Lichess and Chess.com game/play routes: reads visible move lists from the page DOM and open web-component shadow roots, replays the current game position, highlights the last move, and updates from observed DOM changes plus a short fallback poll.
 - Live Opening Detector identifies the opening/ECO and deepest matching variation, shows moves beyond the theory line, and marks `OPENING PHASE COMPLETED` on the synchronized board when the recorded theory line has been passed.
-- Both supported sites auto-open the read-only detector when a live game/play route is recognized. Chess.com DOM selectors are defensive and may need updates when its UI changes.
+- Both supported sites auto-open the read-only detector when a live game/play route is recognized. Chess.com DOM selectors are defensive, search open shadow roots, and may need updates when its UI changes. The detector asks for the study-use confirmation before auto-opening on a live route.
 - Strict live-play boundary: no engine, best-move hints, move recommendations, board clicks, premoves, or move submission. Explorer and PGN analysis remain unavailable while a game is active.
 - Live detector reads only the supported site's visible move-list DOM; selector changes by either site may temporarily prevent detection until the adapter is updated.
 
 ## Live detection limitations
 
-The live adapter is DOM-based and intentionally read-only. It does not request private game data or interact with the board. Lichess and Chess.com may change their page markup; if a move list is temporarily incomplete, OPMAS retries after subsequent DOM updates and through a short fallback poll instead of permanently caching the partial sequence. The opening label is only as precise as the bundled database and the moves visible on the page.
+The live adapter is DOM-based and intentionally read-only. It does not request private game data or interact with the board. Lichess and Chess.com may change their page markup; if a move list is temporarily incomplete, OPMAS retries after subsequent DOM updates and through a short fallback poll. Open shadow roots are observed directly; closed shadow roots remain accessible only through the fallback read of visible host content. The opening label is only as precise as the bundled database and the moves visible on the page.
 
 ## Piece artwork
 
