@@ -59,6 +59,9 @@ importers:
 
   apps/userscript:
     dependencies:
+      '@opmas/chess-core':
+        specifier: workspace:*
+        version: link:../../packages/chess-core
       '@opmas/integrations':
         specifier: workspace:*
         version: link:../../packages/integrations
