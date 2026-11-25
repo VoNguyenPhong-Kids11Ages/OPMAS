@@ -6,7 +6,7 @@ OPMAS is an open-source chess opening toolkit: a browser-first Opening Explorer,
 
 The website is a static React + Vite application and is designed to run on GitHub Pages without a backend.
 
-- Opening Explorer: search the bundled opening database by name, ECO code, or moves.
+- Opening Explorer: search the opening database by name, ECO code, or moves. The JSON database is served as a separate static asset to keep the initial JavaScript bundle small.
 - Opening profiles: inspect opening lines and replay moves on the board.
 - PGN Analyzer: detect an opening from pasted PGN and replay the game.
 - Local-first: core chess and opening detection run in the browser; the optional API is not required.
