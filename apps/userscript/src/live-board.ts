@@ -71,7 +71,7 @@ export function getLiveSearchRoots(doc: Document): LiveSearchRoot[] {
 }
 
 function visibleText(node: HTMLElement): string {
-  return (node.innerText || node.textContent || '').replace(/\\s+/g, ' ').trim();
+  return (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
 /**
