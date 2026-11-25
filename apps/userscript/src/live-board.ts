@@ -28,12 +28,19 @@ export function parseSanTokens(text: string): string[] {
 const SELECTORS: Record<LiveSite, string[]> = {
   lichess: [
     '.round__app .moves .move',
+    '.round__app .moves',
     '.analyse__moves .move',
+    '.analyse__moves',
     '.moves .move',
     '.move-list .move',
     'l4x .move',
   ],
   chesscom: [
+    'wc-simple-move-list',
+    'wc-move-list',
+    'wc-move-list-move',
+    '.move-list-component',
+    '.move-list-row',
     '.move-text-component',
     '.node',
     '.move-list .move',
@@ -57,19 +64,27 @@ export function readLiveMoves(doc: Document, href: string): LiveMoves | null {
   if (!site) return null;
 
   let best: { moves: string[]; source: string } = { moves: [], source: '' };
+  const seen = new Set<string>();
   for (const selector of SELECTORS[site]) {
     const nodes = [...doc.querySelectorAll<HTMLElement>(selector)];
     if (!nodes.length) continue;
-    const joined = nodes.map((node) => node.innerText || node.textContent || '').join(' ');
+
+    // Prefer leaf nodes when a selector also matches a wrapper and its children.
+    const leafNodes = nodes.filter((node) => !nodes.some((other) => other !== node && node.contains(other)));
+    const sample = leafNodes.length ? leafNodes : nodes;
+    const joined = sample.map((node) => node.innerText || node.textContent || '').join(' ');
     const moves = parseSanTokens(joined);
+    const signature = moves.join(' ');
+    if (!signature || seen.has(signature)) continue;
+    seen.add(signature);
     if (moves.length > best.moves.length) best = { moves, source: selector };
   }
 
-  // Some clients render the move list as one accessible text region.
+  // Some clients render the move list as a single accessible text region.
   if (best.moves.length < 2) {
     const fallbackSelectors = site === 'lichess'
       ? ['.round__app', '[aria-label*="move" i]']
-      : ['.game-layout', '[aria-label*="move" i]'];
+      : ['wc-simple-move-list', '.game-layout', '[aria-label*="move" i]'];
     for (const selector of fallbackSelectors) {
       const node = doc.querySelector<HTMLElement>(selector);
       if (!node) continue;
