@@ -43,11 +43,11 @@ area.placeholder = 'Paste PGN here…';
 const out = el('div', '', 'margin-top:10px;line-height:1.5');
 const status = el('p', '', 'font-size:12px;color:#9bb3d1');
 
+let focusAfterRender: 'search' | 'pgn' | null = null;
 function showPanel(focus: 'search' | 'pgn' | null = null): void {
   if (!confirmSafety()) return;
+  focusAfterRender = focus;
   panel.style.display = 'block';
-  if (focus === 'search') search.focus();
-  if (focus === 'pgn') area.focus();
 }
 function hidePanel(): void { panel.style.display = 'none'; }
 
@@ -58,23 +58,6 @@ async function refreshGate(): Promise<boolean> {
     return false;
   }
   return true;
-}
-
-function renderSearch(): void {
-  const matches = db.search(search.value, 20);
-  out.replaceChildren();
-  if (!matches.length) {
-    out.append(el('p', 'No matching openings.'));
-    return;
-  }
-  for (const opening of matches) {
-    const item = el('button', `${opening.eco}  ·  ${opening.name}`,
-      'display:block;width:100%;text-align:left;margin:4px 0;padding:8px;background:#172b49;color:#eaf4ff;border:1px solid #29496d;border-radius:7px;cursor:pointer');
-    item.onclick = () => {
-      out.replaceChildren(el('b', `${opening.eco} · ${opening.name}`), el('p', opening.pgn));
-    };
-    out.append(item);
-  }
 }
 
 function analyzePgn(): void {
@@ -129,6 +112,9 @@ async function render(): Promise<void> {
   const analyze = el('button', 'Analyze PGN', 'margin-top:7px;padding:9px 12px;background:#1676c5;color:white;border:0;border-radius:8px;font-weight:700;cursor:pointer');
   analyze.onclick = analyzePgn;
   panel.append(status, searchLabel, search, searchResults, pgnLabel, area, analyze, out);
+  if (focusAfterRender === 'search') search.focus();
+  if (focusAfterRender === 'pgn') area.focus();
+  focusAfterRender = null;
 }
 
 toggle.onclick = () => {
