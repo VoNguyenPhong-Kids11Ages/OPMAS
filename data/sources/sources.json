@@ -1,0 +1,36 @@
+{
+  "sources": [
+    {
+      "id": "lichess-chess-openings",
+      "name": "lichess-org/chess-openings",
+      "url": "https://github.com/lichess-org/chess-openings",
+      "license": "CC0-1.0",
+      "usage": "opening names, ECO codes and PGN lines (data/sources/lichess-chess-openings/*.tsv)",
+      "verified": false
+    },
+    {
+      "id": "chess.js",
+      "name": "chess.js",
+      "url": "https://github.com/jhlywa/chess.js",
+      "license": "BSD-2-Clause",
+      "usage": "move validation, SAN/FEN (npm dependency of @opmas/chess-core)",
+      "verified": false
+    },
+    {
+      "id": "lichess-api",
+      "name": "Lichess API",
+      "url": "https://lichess.org/api",
+      "license": "LicenseRef-Service-Terms",
+      "usage": "finished-game export, optional opening explorer; check current auth and rate-limit rules",
+      "verified": false
+    },
+    {
+      "id": "pgn-viewer",
+      "name": "PgnViewerJS / pgn-viewer",
+      "url": null,
+      "license": "UNVERIFIED",
+      "usage": "optional PGN board viewer; confirm canonical repository and license before adding",
+      "verified": false
+    }
+  ]
+}

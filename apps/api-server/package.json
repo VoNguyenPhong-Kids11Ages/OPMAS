@@ -1,0 +1,14 @@
+{
+  "name": "@opmas/api-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "tsx watch src/server.ts", "start": "tsx src/server.ts" },
+  "dependencies": {
+    "@opmas/integrations": "workspace:*",
+    "@opmas/opening-database": "workspace:*",
+    "@opmas/opening-detector": "workspace:*",
+    "@opmas/pgn-parser": "workspace:*",
+    "@opmas/safety-gate": "workspace:*"
+  }
+}

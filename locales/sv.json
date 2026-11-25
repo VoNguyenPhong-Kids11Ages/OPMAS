@@ -1,0 +1,25 @@
+{
+  "label": "Svenska",
+  "title": "OPMAS",
+  "library": "Öppningsbibliotek",
+  "detector": "Öppningsdetektor",
+  "search": "Sök öppningar...",
+  "detected": "Identifierad öppning",
+  "noResult": "Ingen öppning hittades.",
+  "paste": "Klistra in PGN här...",
+  "analyze": "Analysera PGN",
+  "moves": "Dragsekvens",
+  "category": "Kategori",
+  "description": "Beskrivning",
+  "eco": "ECO-kod",
+  "warnings": [
+    "Är du helt säker?",
+    "Förstår du hur funktionen fungerar?",
+    "Ditt konto kan bli avstängt om funktionen används felaktigt."
+  ],
+  "blocked": "Funktionerna är låsta under livespel.",
+  "empty": "Ange PGN för att identifiera öppningen.",
+  "count": "Öppningar i databasen",
+  "back": "Tillbaka",
+  "close": "Stäng"
+}

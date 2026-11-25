@@ -1,0 +1,12 @@
+{
+  "name": "@opmas/tool-license-checker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@opmas/chess-core": "workspace:*",
+    "@opmas/opening-database": "workspace:*",
+    "@opmas/opening-detector": "workspace:*",
+    "@opmas/pgn-parser": "workspace:*"
+  }
+}

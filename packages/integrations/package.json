@@ -1,0 +1,11 @@
+{
+  "name": "@opmas/integrations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@opmas/chess-core": "workspace:*",
+    "@opmas/safety-gate": "workspace:*"
+  }
+}

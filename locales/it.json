@@ -1,0 +1,25 @@
+{
+  "label": "Italiano",
+  "title": "OPMAS",
+  "library": "Biblioteca aperture",
+  "detector": "Rilevatore aperture",
+  "search": "Cerca aperture...",
+  "detected": "Apertura identificata",
+  "noResult": "Nessuna apertura trovata.",
+  "paste": "Incolla il PGN qui...",
+  "analyze": "Analizza PGN",
+  "moves": "Sequenza mosse",
+  "category": "Categoria",
+  "description": "Descrizione",
+  "eco": "Codice ECO",
+  "warnings": [
+    "Sei assolutamente sicuro?",
+    "Hai capito come funziona questa funzione?",
+    "Il tuo account potrebbe essere sospeso se usi questa funzione in modo improprio."
+  ],
+  "blocked": "Funzioni disattivate durante le partite live.",
+  "empty": "Inserisci un PGN per identificare l’apertura.",
+  "count": "Aperture nel database",
+  "back": "Indietro",
+  "close": "Chiudi"
+}

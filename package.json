@@ -1,0 +1,34 @@
+{
+  "name": "opening-master",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "fetch:sources": "bash scripts/fetch-sources.sh",
+    "build:db": "tsx tools/database-builder/src/index.ts",
+    "validate": "tsx tools/eco-validator/src/index.ts && tsx tools/pgn-validator/src/index.ts && tsx tools/duplicate-finder/src/index.ts && tsx tools/license-checker/src/index.ts && tsx tools/localization-checker/src/index.ts",
+    "bench": "tsx tools/benchmark/src/index.ts",
+    "dev:web": "pnpm --filter @opmas/website dev",
+    "build:web": "pnpm --filter @opmas/website build",
+    "build:userscript": "pnpm --filter @opmas/userscript build",
+    "dev:api": "pnpm --filter @opmas/api-server dev",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "release:web": "pnpm build:userscript && cp apps/userscript/dist/opmas.user.js apps/website/public/opmas.user.js && pnpm build:web"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}

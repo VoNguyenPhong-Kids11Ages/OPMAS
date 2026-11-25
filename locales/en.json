@@ -1,0 +1,25 @@
+{
+  "label": "English",
+  "title": "OPMAS",
+  "library": "Opening Library",
+  "detector": "Opening Detector",
+  "search": "Search openings...",
+  "detected": "Detected opening",
+  "noResult": "No matching opening found.",
+  "paste": "Paste PGN here...",
+  "analyze": "Analyze PGN",
+  "moves": "Moves",
+  "category": "Category",
+  "description": "Description",
+  "eco": "ECO Code",
+  "warnings": [
+    "Are you absolutely sure?",
+    "Do you understand how this feature works?",
+    "Your account could be banned if you misuse this feature."
+  ],
+  "blocked": "Library and detector are disabled during live games.",
+  "empty": "Enter a PGN to identify its opening.",
+  "count": "Openings in database",
+  "back": "Back",
+  "close": "Close"
+}

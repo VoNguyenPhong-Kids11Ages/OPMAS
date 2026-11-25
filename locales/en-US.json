@@ -1,0 +1,25 @@
+{
+  "label": "English (US)",
+  "title": "OPMAS",
+  "library": "Opening Library",
+  "detector": "Opening Detector",
+  "search": "Search chess openings...",
+  "detected": "Identified opening",
+  "noResult": "No opening match found.",
+  "paste": "Paste your PGN here...",
+  "analyze": "Analyze PGN",
+  "moves": "Move sequence",
+  "category": "Opening type",
+  "description": "Description",
+  "eco": "ECO code",
+  "warnings": [
+    "Are you 100% sure you want to continue?",
+    "Do you really understand this feature?",
+    "Your account may get banned if you use this improperly."
+  ],
+  "blocked": "Features are locked during live games.",
+  "empty": "Paste a PGN to identify the opening.",
+  "count": "Database entries",
+  "back": "Back",
+  "close": "Close"
+}

@@ -1,0 +1,25 @@
+{
+  "label": "Tiếng Việt",
+  "title": "OPMAS",
+  "library": "Thư viện khai cuộc",
+  "detector": "Nhận diện khai cuộc",
+  "search": "Tìm tên khai cuộc...",
+  "detected": "Khai cuộc được nhận diện",
+  "noResult": "Không tìm thấy khai cuộc phù hợp.",
+  "paste": "Dán PGN vào đây...",
+  "analyze": "Phân tích PGN",
+  "moves": "Chuỗi nước đi",
+  "category": "Phân loại",
+  "description": "Mô tả",
+  "eco": "Mã ECO",
+  "warnings": [
+    "Mày chắc chắn muốn tiếp tục chứ?",
+    "Mày thực sự hiểu tính năng này hoạt động thế nào chứ?",
+    "Tài khoản của mày có thể bị ban nếu sử dụng sai quy định."
+  ],
+  "blocked": "Thư viện và detector bị khóa trong trận đấu Live.",
+  "empty": "Nhập PGN để nhận diện khai cuộc.",
+  "count": "Số khai cuộc trong cơ sở dữ liệu",
+  "back": "Quay lại",
+  "close": "Đóng"
+}

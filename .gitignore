@@ -1,0 +1,7 @@
+node_modules
+dist
+.DS_Store
+*.log
+data/sources/lichess-chess-openings/*.tsv
+test-results
+playwright-report
