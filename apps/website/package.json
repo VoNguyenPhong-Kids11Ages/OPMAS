@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
-  "dependencies": {
+  "dependencies": {\n    "@opmas/chess-core": "workspace:*",
     "@opmas/opening-database": "workspace:*",
     "@opmas/opening-detector": "workspace:*",
     "@opmas/pgn-parser": "workspace:*",
