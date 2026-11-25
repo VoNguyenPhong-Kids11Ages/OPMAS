@@ -13,8 +13,8 @@ describe('live move-list parser', () => {
   });
 
   it('handles castling check suffixes, disambiguation and promotion', () => {
-    expect(parseSanTokens('1. O-O+ O-O-O# 2. Nbd7 R1e2 3. exd8=Q+'))
-      .toEqual(['O-O+', 'O-O-O#', 'Nbd7', 'R1e2', 'exd8=Q+']);
+    expect(parseSanTokens('1. O-O+ O-O-O# 2. 0-0+ 0-0-0# 3. Nbd7 R1e2 4. exd8=Q+'))
+      .toEqual(['O-O+', 'O-O-O#', 'O-O+', 'O-O-O#', 'Nbd7', 'R1e2', 'exd8=Q+']);
   });
 
   it('reads move text from an open Chess.com shadow root', () => {
