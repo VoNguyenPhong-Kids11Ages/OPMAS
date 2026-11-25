@@ -94,18 +94,22 @@ export function readLiveMoves(doc: Document, href: string): LiveMoves | null {
   const roots = getLiveSearchRoots(doc);
 
   for (const selector of SELECTORS[site]) {
-    const nodes = roots.flatMap((root) => Array.from(root.querySelectorAll<HTMLElement>(selector)));
-    if (!nodes.length) continue;
+    // Keep candidates root-local: a host's composed text can duplicate the same
+    // moves exposed by its shadow-root children.
+    for (const root of roots) {
+      const nodes = Array.from(root.querySelectorAll<HTMLElement>(selector));
+      if (!nodes.length) continue;
 
-    // Prefer leaf nodes when a selector also matches a wrapper and its children.
-    const leafNodes = nodes.filter((node) => !nodes.some((other) => other !== node && node.contains(other)));
-    const sample = leafNodes.length ? leafNodes : nodes;
-    const joined = sample.map(visibleText).filter(Boolean).join(' ');
-    const moves = parseSanTokens(joined);
-    const signature = moves.join(' ');
-    if (!signature || seen.has(signature)) continue;
-    seen.add(signature);
-    if (moves.length > best.moves.length) best = { moves, source: selector };
+      // Prefer leaf nodes when a selector also matches a wrapper and its children.
+      const leafNodes = nodes.filter((node) => !nodes.some((other) => other !== node && node.contains(other)));
+      const sample = leafNodes.length ? leafNodes : nodes;
+      const joined = sample.map(visibleText).filter(Boolean).join(' ');
+      const moves = parseSanTokens(joined);
+      const signature = moves.join(' ');
+      if (!signature || seen.has(signature)) continue;
+      seen.add(signature);
+      if (moves.length > best.moves.length) best = { moves, source: selector };
+    }
   }
 
   // Keep fallback selectors narrow: broad game containers can include chat or annotations.
