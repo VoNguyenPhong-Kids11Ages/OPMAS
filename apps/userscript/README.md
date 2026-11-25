@@ -12,7 +12,9 @@ OPMAS is a study-first chess opening companion for Chess.com and Lichess, built 
 - Vietnamese-first interface with the shared language selector.
 - Tampermonkey menu commands and keyboard Escape to close.
 - Defensive mount recovery for pages that replace their DOM.
-- Read-only Live Opening Detector for supported Lichess game URLs and Chess.com live/play pages: observes the visible move list, identifies the deepest matching opening/variation, tracks moves beyond the matched theory line, and updates as the game progresses.
+- Live board mirroring for Lichess game URLs (`lichess.org/<game-id>/`): reads the visible move list, replays the current game position on the OPMAS board, and updates on DOM move events.
+- Live Opening Detector identifies the opening/ECO and deepest matching variation, shows moves beyond the theory line, and marks `OPENING PHASE COMPLETED` on the synchronized board when the recorded theory line has been passed.
+- Chess.com live/play pages retain read-only opening detection where the visible move list is available.
 - Strict live-play boundary: no engine, best-move hints, move recommendations, board clicks, premoves, or move submission. Explorer and PGN analysis remain unavailable while a game is active.
 - Live detector reads only the supported site's visible move-list DOM; selector changes by either site may temporarily prevent detection until the adapter is updated.
 
