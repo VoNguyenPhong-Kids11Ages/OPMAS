@@ -75,6 +75,33 @@ function visibleText(node: HTMLElement): string {
 }
 
 /**
+ * Lichess embeds the current game's move history in its bootstrap JSON.
+ * Treat it as a fallback: the visible move list wins whenever it is at least
+ * as complete, because page-init-data may be a snapshot from page load.
+ */
+function readLichessBootstrapMoves(doc: Document): string[] {
+  const script = doc.querySelector<HTMLScriptElement>('#page-init-data');
+  if (!script?.textContent) return [];
+  try {
+    const payload: unknown = JSON.parse(script.textContent);
+    if (!payload || typeof payload !== 'object') return [];
+    const data = (payload as { data?: { game?: { turns?: number; steps?: Array<{ ply?: number; san?: string | null }> } } }).data;
+    const game = data?.game;
+    if (!game || !Array.isArray(game.steps)) return [];
+    const moves = game.steps
+      .filter((step): step is { ply: number; san: string } =>
+        Number.isInteger(step.ply) && step.ply > 0 && typeof step.san === 'string' && step.san.length > 0)
+      .sort((a, b) => a.ply - b.ply)
+      .map((step) => step.san);
+    // A partially serialized bootstrap payload must not replace a good DOM read.
+    if (typeof game.turns === 'number' && moves.length > game.turns) return [];
+    return moves;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Read only the visible move list from a supported chess site. No board clicks,
  * move submission, engine access, network requests or opponent-control behavior.
  */
@@ -122,6 +149,13 @@ export function readLiveMoves(doc: Document, href: string): LiveMoves | null {
         const moves = parseSanTokens(visibleText(node));
         if (moves.length > best.moves.length) best = { moves, source: selector };
       }
+    }
+  }
+
+  if (site === 'lichess') {
+    const bootstrapMoves = readLichessBootstrapMoves(doc);
+    if (bootstrapMoves.length > best.moves.length) {
+      best = { moves: bootstrapMoves, source: '#page-init-data data.game.steps[].san' };
     }
   }
 
