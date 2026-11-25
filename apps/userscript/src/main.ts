@@ -52,13 +52,15 @@ function getFavorites(): string[] {
   }
 }
 
-function isFavorite(eco: string): boolean {
-  return getFavorites().includes(eco);
+function isFavorite(opening: Opening): boolean {
+  return getFavorites().includes(opening.pgn);
 }
 
-function toggleFavorite(eco: string): void {
+function toggleFavorite(opening: Opening): void {
   const favorites = getFavorites();
-  const next = favorites.includes(eco) ? favorites.filter((item) => item !== eco) : [...favorites, eco];
+  const next = favorites.includes(opening.pgn)
+    ? favorites.filter((item) => item !== opening.pgn)
+    : [...favorites, opening.pgn];
   localStorage.setItem(FAV_KEY, JSON.stringify(next));
   renderContent();
 }
@@ -199,8 +201,8 @@ function renderExplorer(host: HTMLElement): void {
   searchInput.oninput = updateList;
   host.replaceChildren(label, hint, searchInput, filter, count, list, detail);
   updateList();
-  if (selectedEco) {
-    const selected = db.all().find((opening) => opening.eco === selectedEco);
+  if (selectedPgn) {
+    const selected = db.all().find((opening) => opening.pgn === selectedPgn);
     if (selected) showOpening(selected, detail);
   }
   if (focusAfterRender === 'search') searchInput.focus();
@@ -239,8 +241,8 @@ function renderFavorites(host: HTMLElement): void {
   const favorites = getFavorites();
   const heading = el('div', 'Saved openings', 'font-weight:800;margin:8px 0');
   const list = el('div');
-  for (const eco of favorites) {
-    const opening = db.all().find((item) => item.eco === eco);
+  for (const pgn of favorites) {
+    const opening = db.all().find((item) => item.pgn === pgn);
     if (!opening) continue;
     const item = button(`★ ${opening.eco} · ${opening.name}`, () => showOpening(opening, detail));
     item.style.cssText += ';display:block;width:100%;text-align:left;margin:5px 0;white-space:normal';
