@@ -24,6 +24,13 @@ describe('detectOpening', () => {
   it('recognises transpositions', () => {
     expect(detectOpening(db, 'Nf3 d5 d4 Nf6 Bf4'.split(' '))?.opening.name).toBe('London System');
   });
+  it('uses the PGN starting FEN when detecting custom-position games', () => {
+    const fen = '4k3/8/8/8/8/8/8/4K3 w - - 0 1';
+    const plies = replay(['Kf2'], fen);
+    const customDb = new OpeningDatabase([{ eco: 'A00', name: 'Custom FEN Test', pgn: 'Kf2', moves: ['Kf2'], key: plies[0]!.key, ply: 1 }]);
+    expect(detectOpening(customDb, ['Kf2'], fen)?.opening.name).toBe('Custom FEN Test');
+  });
+
   it('returns null for illegal input', () => {
     expect(detectOpening(db, ['e5'])).toBeNull();
   });
