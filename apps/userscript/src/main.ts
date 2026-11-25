@@ -365,6 +365,7 @@ function renderLiveDetector(host: HTMLElement): void {
   const moveLine = el('pre', '', 'white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:9px;background:#f5f8fc;color:#31445e;font:12px/1.7 ui-monospace,SFMono-Regular,monospace');
   const refresh = actionButton(t('Làm mới', 'Refresh'), () => update(), true);
   const details = el('div');
+  renderBoard(START_FEN, boardHost);
   host.append(
     makeSectionTitle(t('Live Opening Detector', 'Live Opening Detector'), t('Tự đọc danh sách nước đi hiển thị trên Lichess/Chess.com, đồng bộ vị trí và nhận diện biến thể theo từng nước.', 'Reads the visible move list on Lichess/Chess.com, mirrors the position, and identifies opening variations move by move.')),
     banner, status, result, boardCaption, boardHost, boardMeta,
