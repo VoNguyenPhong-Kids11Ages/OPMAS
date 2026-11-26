@@ -174,7 +174,7 @@ function Analyzer({ db }: { db: OpeningDatabase }) {
   const [engineRows, setEngineRows] = useState<Array<{ ply: number; move: string; loss: number; label: string }>>([]);
   useEffect(() => setPly(0), [pgn]);
   const validReplay = positions.length === parsed.moves.length + 1;
-  const hasFinalResult = /(?:\\[Result\\s+"(?:1-0|0-1|1\\/2-1\\/2)"\\]|(?:1-0|0-1|1\\/2-1\\/2)\\s*$)/m.test(pgn);
+  const hasFinalResult = pgn.includes('[Result "1-0"]') || pgn.includes('[Result "0-1"]') || pgn.includes('[Result "1/2-1/2"]') || /(?:1-0|0-1|1\/2-1\/2)\s*$/.test(pgn);
   const canRunEngine = gameFinishedConfirmed && hasFinalResult && validReplay && parsed.moves.length > 1;
 
   async function runStockfishReview() {
@@ -275,7 +275,7 @@ function LiveHelp() {
         </article>
         <article className="panel">
           <span className="panel-kicker">03 · WEBSITE</span><strong>PGN</strong><h2>Phân tích trên website</h2>
-          <p>Trang web độc lập không thể tự đọc tab Chess.com/Lichess do giới hạn bảo mật giữa các website. Dán PGN vào PGN Analyzer để phát lại bàn cờ và tra cứu khai cuộc.</p>
+          <p>Trang web độc lập không thể tự đọc tab Chess.com/Lichess do giới hạn bảo mật. Sau khi ván kết thúc, dán PGN vào Analyzer để phát lại, nhận diện khai cuộc và chạy đánh giá Stockfish.</p>
           <a className="inline-link" href="#/analyzer">Mở PGN Analyzer →</a>
         </article>
       </section>
