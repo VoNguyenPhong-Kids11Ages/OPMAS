@@ -13,7 +13,7 @@ import { CHESSNUT_PIECES } from '../../../packages/ui-components/src/chessnut-pi
 const db = new OpeningDatabase(openings as Opening[]);
 const KEYS = { language: 'opmas-language', favorites: 'opmas-favorites-v2', safety: 'opmas-safety-v2' };
 let tr = createTranslator(localStorage.getItem(KEYS.language) ?? 'vi');
-type Tab = 'explorer' | 'analyzer' | 'favorites';
+type Tab = 'live' | 'explorer' | 'analyzer' | 'favorites';
 let activeTab: Tab = 'explorer';
 let selectedEco: string | null = null;
 let gateAllowed = false;
@@ -165,8 +165,9 @@ function makeHeader(): HTMLElement {
   return header;
 }
 function makeTabs(): HTMLElement {
-  const nav = el('nav', '', 'display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:5px;background:#f3f6fa;border-radius:12px;margin:10px 0 13px');
+  const nav = el('nav', '', 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:5px;background:#f3f6fa;border-radius:12px;margin:10px 0 13px');
   const tabs: Array<[Tab, string]> = [
+    ['live', t('Ván đang chơi', 'Live game')],
     ['explorer', t('Khám phá', 'Explorer')],
     ['analyzer', 'PGN'],
     ['favorites', t('Đã lưu', 'Saved')],
@@ -486,10 +487,19 @@ function renderLiveDetector(host: HTMLElement): void {
 }
 function renderContent(): void {
   content.replaceChildren(makeTabs());
+  if (activeTab === 'live') {
+    if (liveMode) {
+      const view = el('div');
+      content.append(view);
+      renderLiveDetector(view);
+    } else {
+      content.append(makeSectionTitle(t('Giúp đỡ ván đang chơi', 'Live game help'), t('Mở một ván trên Chess.com hoặc Lichess, sau đó chọn mục này để OPMAS đồng bộ bàn cờ và nhận diện khai cuộc.', 'Open a game on Chess.com or Lichess, then choose this section to mirror the board and identify the opening.')));
+      content.append(el('div', t('Chưa phát hiện ván đang chơi. Hãy mở một trang ván cờ được hỗ trợ rồi nhấn “Ván đang chơi”.', 'No active game detected. Open a supported game page, then select “Live game”.'), 'padding:12px;border:1px solid #b8d7fb;border-radius:11px;background:#eff6ff;color:#174b83;font-size:12px;line-height:1.6'));
+    }
+    return;
+  }
   if (liveMode) {
-    const view = el('div');
-    content.append(view);
-    renderLiveDetector(view);
+    content.append(el('div', t('Trên trang đang chơi, OPMAS chỉ bật mục “Ván đang chơi” để đồng bộ bàn cờ và tra cứu khai cuộc; các công cụ phân tích khác sẽ mở sau khi ván kết thúc.', 'During a live game, OPMAS keeps the live board and opening identification available; other analysis tools unlock after the game ends.'), 'padding:12px;border:1px solid #f4d7a2;border-radius:11px;background:#fff8e9;color:#87520c;font-size:12px;line-height:1.6'));
     return;
   }
   if (!gateAllowed) {
@@ -510,6 +520,8 @@ async function render(focus: 'search' | 'pgn' | null = null): Promise<void> {
   const gate = isSupportedGame ? { allowed: false as const, reason: 'game-in-progress' as const } : await checkGate(location.href, fetchStatus);
   if (token !== renderToken) return;
   liveMode = isSupportedGame;
+  if (liveMode) activeTab = 'live';
+  else if (activeTab === 'live') activeTab = 'explorer';
   gateAllowed = gate.allowed;
   const status = el('div', '', 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:9px;background:#f5f8fc;color:#718096;font-size:11px');
   status.append(el('span', `${db.size.toLocaleString()} ${t('khai cuộc trong thư viện', 'openings in library')}`), el('span', liveMode ? '● LIVE · READ-ONLY' : gateAllowed ? '● Ready' : '● Locked', `font-weight:800;color:${liveMode ? palette.blue : gateAllowed ? palette.green : palette.amber}`));
@@ -563,6 +575,10 @@ window.addEventListener('pageshow', ensureMounted);
 window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && panel.style.display !== 'none') closePanel(); });
 
 if (registerMenu) {
+  registerMenu('♞ OPMAS — Help current game', () => {
+    if (isLiveGameContext()) openPanel('live');
+    else setNotice(t('Mở một ván Chess.com hoặc Lichess trước nhé.', 'Open a Chess.com or Lichess game first.'));
+  });
   registerMenu('♞ OPMAS — Open Explorer', () => openPanel('explorer', 'search'));
   registerMenu('OPMAS — Analyze PGN', () => openPanel('analyzer', 'pgn'));
   registerMenu('OPMAS — Saved openings', () => openPanel('favorites'));
