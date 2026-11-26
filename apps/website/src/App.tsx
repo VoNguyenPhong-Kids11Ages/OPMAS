@@ -11,7 +11,7 @@ type Route = 'explorer' | 'analyzer' | 'about' | 'live';
 
 function useRoute(): Route {
   const read = (): Route => {
-    const route = location.hash.replace(/^#\/?/, '');
+    const route = location.hash.replace(/^#\/?/, '').split('?')[0];
     return route === 'analyzer' || route === 'about' || route === 'live' ? route : 'explorer';
   };
   const [route, setRoute] = useState<Route>(read);
@@ -159,7 +159,7 @@ function Explorer({ db }: { db: OpeningDatabase }) {
 }
 
 function Analyzer({ db }: { db: OpeningDatabase }) {
-  const [pgn, setPgn] = useState('');
+  const [pgn, setPgn] = useState(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('pgn') ?? '');
   const parsed = useMemo(() => parsePgn(pgn), [pgn]);
   const detection = useMemo(() => pgn.trim() ? detectOpening(db, parsed.moves, parsed.headers['FEN']) : null, [pgn, parsed.moves, parsed.headers['FEN']]);
   const positions = useMemo(() => {
@@ -167,8 +167,54 @@ function Analyzer({ db }: { db: OpeningDatabase }) {
     catch { return [START_FEN]; }
   }, [parsed.moves, parsed.headers['FEN']]);
   const [ply, setPly] = useState(0);
+  const [gameFinishedConfirmed, setGameFinishedConfirmed] = useState(false);
+  const [engineBusy, setEngineBusy] = useState(false);
+  const [engineProgress, setEngineProgress] = useState(0);
+  const [engineError, setEngineError] = useState('');
+  const [engineRows, setEngineRows] = useState<Array<{ ply: number; move: string; loss: number; label: string }>>([]);
   useEffect(() => setPly(0), [pgn]);
   const validReplay = positions.length === parsed.moves.length + 1;
+  const hasFinalResult = /(?:\\[Result\\s+"(?:1-0|0-1|1\\/2-1\\/2)"\\]|(?:1-0|0-1|1\\/2-1\\/2)\\s*$)/m.test(pgn);
+  const canRunEngine = gameFinishedConfirmed && hasFinalResult && validReplay && parsed.moves.length > 1;
+
+  async function runStockfishReview() {
+    if (!canRunEngine || engineBusy) return;
+    setEngineBusy(true);
+    setEngineError('');
+    setEngineRows([]);
+    setEngineProgress(0);
+    try {
+      // Post-game only: evaluate a bounded number of positions, never the live board.
+      const fens = positions.slice(0, Math.min(positions.length, 41));
+      const scores: number[] = [];
+      for (let index = 0; index < fens.length; index += 1) {
+        const endpoint = new URL('https://stockfish.online/api/s/v2.php');
+        endpoint.searchParams.set('fen', fens[index]!);
+        endpoint.searchParams.set('depth', '12');
+        endpoint.searchParams.set('mode', 'eval');
+        const response = await fetch(endpoint.toString());
+        if (!response.ok) throw new Error(`Stockfish API HTTP ${response.status}`);
+        const data = await response.json() as { success?: boolean; evaluation?: number; eval?: number; mate?: number | null; data?: string };
+        if (data.success === false) throw new Error(data.data || 'Stockfish không phân tích được vị trí này.');
+        let score = typeof data.evaluation === 'number' ? data.evaluation : typeof data.eval === 'number' ? data.eval : Number.NaN;
+        if (!Number.isFinite(score) && typeof data.mate === 'number') score = data.mate > 0 ? 99 : data.mate < 0 ? -99 : 0;
+        if (!Number.isFinite(score)) throw new Error('API không trả về evaluation hợp lệ.');
+        scores.push(score);
+        setEngineProgress(index + 1);
+        if (index < fens.length - 1) await new Promise((resolve) => window.setTimeout(resolve, 350));
+      }
+      const rows = parsed.moves.slice(0, scores.length - 1).map((move, index) => {
+        const loss = Math.max(0, index % 2 === 0 ? scores[index]! - scores[index + 1]! : scores[index + 1]! - scores[index]!);
+        const label = loss <= 0.08 ? 'Best' : loss <= 0.25 ? 'Excellent' : loss <= 0.5 ? 'Good' : loss <= 1 ? 'Inaccuracy' : loss <= 2 ? 'Mistake' : 'Blunder';
+        return { ply: index + 1, move, loss, label };
+      });
+      setEngineRows(rows);
+    } catch (error) {
+      setEngineError(error instanceof Error ? error.message : 'Không thể kết nối Stockfish.');
+    } finally {
+      setEngineBusy(false);
+    }
+  }
 
   return (
     <div className="tool-page">
@@ -184,6 +230,27 @@ function Analyzer({ db }: { db: OpeningDatabase }) {
           <div className="board-controls centered"><button onClick={() => setPly(0)} disabled={ply === 0}>⟲</button><button onClick={() => setPly((value) => Math.max(0, value - 1))} disabled={ply === 0}>‹</button><button onClick={() => setPly((value) => Math.min(parsed.moves.length, value + 1))} disabled={!validReplay || ply >= parsed.moves.length}>›</button><button onClick={() => setPly(parsed.moves.length)} disabled={!validReplay || ply === parsed.moves.length}>⤓</button></div>
           {!validReplay && parsed.moves.length > 0 && <p className="error-copy">Không thể phát lại toàn bộ nước đi. Kiểm tra PGN hoặc FEN bắt đầu.</p>}
         </div>
+      </section>
+      <section className="panel" style={{ marginTop: 16 }}>
+        <div className="panel-heading"><div><span className="panel-kicker">STOCKFISH · POST-GAME</span><h2>Đánh giá nước đi</h2></div><span className="result-count">Depth 12</span></div>
+        <p className="muted-copy">Stockfish đánh giá các vị trí sau khi ván đã kết thúc. Mỗi nước được xếp theo độ hụt điểm ước tính; đây là phân loại tham khảo, không phải nhãn Brilliant chính thức.</p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '13px 0', color: 'var(--ink)', fontSize: 12 }}>
+          <input type="checkbox" checked={gameFinishedConfirmed} onChange={(event) => setGameFinishedConfirmed(event.target.checked)} />
+          Tao xác nhận PGN này là ván đã kết thúc.
+        </label>
+        {!hasFinalResult && <p className="error-copy">PGN cần có kết quả cuối ván (1-0, 0-1 hoặc 1/2-1/2), không dùng dấu *.</p>}
+        <button className="download-link" disabled={!canRunEngine || engineBusy} onClick={() => void runStockfishReview()} style={{ border: 0, cursor: canRunEngine && !engineBusy ? 'pointer' : 'not-allowed', opacity: canRunEngine && !engineBusy ? 1 : .5 }}>
+          {engineBusy ? `Stockfish đang phân tích ${engineProgress}/${Math.min(positions.length, 41)}…` : 'Phân tích ván đã kết thúc bằng Stockfish'}
+        </button>
+        {positions.length > 41 && <p className="muted-copy">Giới hạn 40 nửa nước đầu tiên mỗi lượt phân tích để tránh gửi quá nhiều yêu cầu.</p>}
+        {engineError && <p className="error-copy">{engineError}. API bên ngoài có thể đang bận hoặc chặn yêu cầu từ trình duyệt.</p>}
+        {engineRows.length > 0 && <div className="related-list" style={{ marginTop: 12 }}>
+          {engineRows.map((row) => <div key={row.ply} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 10px', borderBottom: '1px solid var(--line)', fontSize: 11 }}>
+            <span><b>{Math.ceil(row.ply / 2)}{row.ply % 2 ? '.' : '...'}</b> {row.move}</span>
+            <span style={{ color: row.label === 'Blunder' ? '#b42318' : row.label === 'Mistake' ? '#a86610' : 'var(--ink)' }}>{row.label} · {row.loss.toFixed(2)}</span>
+          </div>)}
+        </div>}
+        <p className="muted-copy" style={{ marginTop: 10 }}>Chỉ gửi FEN của từng vị trí đến Stockfish Online; PGN đầy đủ không được gửi. Không có phân tích engine trong trận đang diễn ra.</p>
       </section>
     </div>
   );
