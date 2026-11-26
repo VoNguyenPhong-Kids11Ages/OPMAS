@@ -7,12 +7,12 @@ import { replay, START_FEN } from '@opmas/chess-core';
 import { Board } from '@opmas/ui-components';
 
 const API_BASE = (import.meta as ImportMeta & { env: { VITE_OPMAS_API_URL?: string } }).env.VITE_OPMAS_API_URL?.replace(/\/$/, '') ?? '';
-type Route = 'explorer' | 'analyzer' | 'about';
+type Route = 'explorer' | 'analyzer' | 'about' | 'live';
 
 function useRoute(): Route {
   const read = (): Route => {
     const route = location.hash.replace(/^#\/?/, '');
-    return route === 'analyzer' || route === 'about' ? route : 'explorer';
+    return route === 'analyzer' || route === 'about' || route === 'live' ? route : 'explorer';
   };
   const [route, setRoute] = useState<Route>(read);
   useEffect(() => {
@@ -189,6 +189,40 @@ function Analyzer({ db }: { db: OpeningDatabase }) {
   );
 }
 
+
+function LiveHelp() {
+  return (
+    <div className="tool-page">
+      <div className="page-intro">
+        <div><div className="eyebrow"><span className="eyebrow-dot" /> LIVE GAME COMPANION</div><h1>Live Game Helper</h1><p>Đồng bộ bàn cờ và nhận diện khai cuộc bằng OPMAS Userscript.</p></div>
+      </div>
+      <section className="about-grid">
+        <article className="panel">
+          <span className="panel-kicker">01 · INSTALL</span><strong>Userscript</strong><h2>Cài OPMAS lên trình duyệt</h2>
+          <p>Cài Tampermonkey hoặc Violentmonkey, sau đó tải userscript và bật tiện ích. Đây là phần có quyền đọc trang Chess.com/Lichess hiện tại.</p>
+          <a className="download-link" href={import.meta.env.BASE_URL + 'opmas.user.js'} download>Tải OPMAS Userscript ↓</a>
+        </article>
+        <article className="panel">
+          <span className="panel-kicker">02 · SAME TAB</span><strong>Read-only</strong><h2>Đồng bộ ván đang chơi</h2>
+          <p>Mở ván trên Chess.com hoặc Lichess trong cùng tab đã cài userscript, nhấn nút OPMAS rồi chọn “Ván đang chơi”. Công cụ chỉ đọc lịch sử nước đi, dựng bàn cờ riêng và nhận diện khai cuộc; không can thiệp bàn cờ hoặc gợi ý nước đi.</p>
+        </article>
+        <article className="panel">
+          <span className="panel-kicker">03 · WEBSITE</span><strong>PGN</strong><h2>Phân tích trên website</h2>
+          <p>Trang web độc lập không thể tự đọc tab Chess.com/Lichess do giới hạn bảo mật giữa các website. Dán PGN vào PGN Analyzer để phát lại bàn cờ và tra cứu khai cuộc.</p>
+          <a className="inline-link" href="#/analyzer">Mở PGN Analyzer →</a>
+        </article>
+      </section>
+      <section className="panel" style={{ marginTop: 16 }}>
+        <div className="panel-heading"><div><span className="panel-kicker">SUPPORTED SITES</span><h2>Mở nền tảng cờ vua</h2></div></div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <a className="github-link" href="https://lichess.org/" target="_blank" rel="noreferrer">Lichess ↗</a>
+          <a className="github-link" href="https://www.chess.com/" target="_blank" rel="noreferrer">Chess.com ↗</a>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function About({ db }: { db: OpeningDatabase }) {
   return <div className="tool-page"><div className="page-intro"><div><div className="eyebrow"><span className="eyebrow-dot" /> OPEN SOURCE CHESS TOOLS</div><h1>About OPMAS</h1><p>Opening Master là bộ công cụ mã nguồn mở để khám phá, nhận diện và nghiên cứu khai cuộc cờ vua.</p></div></div><section className="about-grid"><article className="panel"><span className="panel-kicker">DATABASE</span><strong>{db.size.toLocaleString('vi-VN')}</strong><h2>Opening lines</h2><p>Thư viện khai cuộc được lập chỉ mục theo ECO, tên và chuỗi nước đi.</p></article><article className="panel"><span className="panel-kicker">OPEN SOURCE</span><strong>MIT</strong><h2>Built in public</h2><p>Đóng góp mã nguồn, báo lỗi hoặc đề xuất tính năng trên GitHub.</p><a className="inline-link" href="https://github.com/VoNguyenPhong-Kids11Ages/OPMAS" target="_blank" rel="noreferrer">Xem repository ↗</a></article><article className="panel"><span className="panel-kicker">INTEGRATIONS</span><strong>2</strong><h2>Chess platforms</h2><p>Hệ sinh thái OPMAS có userscript hỗ trợ Chess.com và Lichess.</p></article></section></div>;
 }
@@ -215,7 +249,7 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <header className="topbar"><a className="brand" href="#/explorer"><span className="brand-mark">O</span><span>OPMAS<small>OPENING MASTER</small></span></a><nav className="main-nav" aria-label="Main navigation"><a href="#/explorer" aria-current={route === 'explorer' ? 'page' : undefined}>Explorer</a><a href="#/analyzer" aria-current={route === 'analyzer' ? 'page' : undefined}>PGN Analyzer</a><a href="#/about" aria-current={route === 'about' ? 'page' : undefined}>About</a></nav><div className="header-actions"><a className="download-link" href={`${import.meta.env.BASE_URL}opmas.user.js`} download>Tải userscript ↓</a><a className="github-link" href="https://github.com/VoNguyenPhong-Kids11Ages/OPMAS" target="_blank" rel="noreferrer">GitHub ↗</a></div></header>
+      <header className="topbar"><a className="brand" href="#/explorer"><span className="brand-mark">O</span><span>OPMAS<small>OPENING MASTER</small></span></a><nav className="main-nav" aria-label="Main navigation"><a href="#/explorer" aria-current={route === 'explorer' ? 'page' : undefined}>Explorer</a><a href="#/analyzer" aria-current={route === 'analyzer' ? 'page' : undefined}>PGN Analyzer</a><a href="#/live" aria-current={route === 'live' ? 'page' : undefined}>Live Help</a><a href="#/about" aria-current={route === 'about' ? 'page' : undefined}>About</a></nav><div className="header-actions"><a className="download-link" href={`${import.meta.env.BASE_URL}opmas.user.js`} download>Tải userscript ↓</a><a className="github-link" href="https://github.com/VoNguyenPhong-Kids11Ages/OPMAS" target="_blank" rel="noreferrer">GitHub ↗</a></div></header>
       <main>
         {!db ? (
           <section className="panel" role="status" style={{ margin: '48px auto', maxWidth: 680, padding: 28 }}>
@@ -223,7 +257,7 @@ export function App() {
             <p>{loadError ? 'Kiểm tra kết nối rồi tải lại trang. Cơ sở dữ liệu được phục vụ như một tệp riêng để website tải nhanh hơn.' : 'Đang nạp thư viện khai cuộc.'}</p>
             {loadError && <button onClick={() => location.reload()}>Thử lại</button>}
           </section>
-        ) : route === 'analyzer' ? <Analyzer db={db} /> : route === 'about' ? <About db={db} /> : <Explorer db={db} />}
+        ) : route === 'analyzer' ? <Analyzer db={db} /> : route === 'live' ? <LiveHelp /> : route === 'about' ? <About db={db} /> : <Explorer db={db} />}
       </main>
       <footer className="site-footer"><span>© {new Date().getFullYear()} OPMAS · Opening Master</span><span>Open source chess intelligence</span></footer>
     </div>
