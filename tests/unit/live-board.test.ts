@@ -83,4 +83,50 @@ describe('live move-list parser', () => {
     expect(parseSanTokens('1. d4 {Opening move} 0:05 d5 2. c4 (Queen’s Gambit) e6'))
       .toEqual(['d4', 'd5', 'c4', 'e6']);
   });
+  it('reads ordered SAN attributes when the site hides rendered move text', () => {
+    const makeNode = (ply: string, san: string) => ({
+      innerText: '',
+      textContent: '',
+      contains: () => false,
+      hasAttribute: (name: string) => name === 'data-ply' || name === 'data-san',
+      getAttribute: (name: string) => name === 'data-ply' ? ply : name === 'data-san' ? san : null,
+    } as unknown as HTMLElement);
+    const nodes = [makeNode('4', 'Nf3'), makeNode('2', 'e5'), makeNode('3', 'Nf3'), makeNode('1', 'e4')];
+    const shadowRoot = {
+      querySelectorAll: (selector: string) => selector === '[data-ply][data-san]' || selector === '[data-san]' || selector === '[data-ply]' ? nodes : [],
+      querySelector: () => null,
+    } as unknown as ShadowRoot;
+    const host = { shadowRoot } as unknown as HTMLElement;
+    const doc = {
+      querySelectorAll: (selector: string) => selector === '*' ? [host] : [],
+      querySelector: () => null,
+    } as unknown as Document;
+
+    expect(readLiveMoves(doc, 'https://www.chess.com/game/live/123456')?.moves)
+      .toEqual(['e4', 'e5', 'Nf3', 'Nf3']);
+  });
+
+  it('converts ordered UCI attributes into SAN from the initial position', () => {
+    const makeNode = (ply: string, uci: string) => ({
+      innerText: '',
+      textContent: '',
+      contains: () => false,
+      hasAttribute: (name: string) => name === 'data-ply' || name === 'data-uci',
+      getAttribute: (name: string) => name === 'data-ply' ? ply : name === 'data-uci' ? uci : null,
+    } as unknown as HTMLElement);
+    const nodes = [makeNode('3', 'g1f3'), makeNode('1', 'e2e4'), makeNode('4', 'b8c6'), makeNode('2', 'e7e5')];
+    const shadowRoot = {
+      querySelectorAll: (selector: string) => selector === '[data-ply]' ? nodes : [],
+      querySelector: () => null,
+    } as unknown as ShadowRoot;
+    const host = { shadowRoot } as unknown as HTMLElement;
+    const doc = {
+      querySelectorAll: (selector: string) => selector === '*' ? [host] : [],
+      querySelector: () => null,
+    } as unknown as Document;
+
+    expect(readLiveMoves(doc, 'https://www.chess.com/game/live/123456')?.moves)
+      .toEqual(['e4', 'e5', 'Nf3', 'Nc6']);
+  });
+
 });
