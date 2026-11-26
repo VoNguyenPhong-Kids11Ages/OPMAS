@@ -8,7 +8,7 @@ export default defineConfig({
       userscript: {
         name: 'OPMAS — Opening Master',
         namespace: 'opmas',
-        version: '2.5.3',
+        version: '2.5.4',
         description: 'Opening explorer with a dedicated read-only live-game board and opening identification for Lichess and Chess.com',
         icon: 'https://raw.githubusercontent.com/VoNguyenPhong-Kids11Ages/OPMAS/feat/light-opening-explorer/apps/userscript/public/opmas-icon.svg',
         match: ['https://chess.com/*', 'https://www.chess.com/*', 'https://lichess.org/*'],
