@@ -25,4 +25,11 @@ jobs:
           path: apps/userscript/dist/opmas.user.js
           if-no-files-found: error
           retention-days: 14
+      - name: Upload built website
+        uses: actions/upload-artifact@v4
+        with:
+          name: opmas-website
+          path: apps/website/dist/
+          if-no-files-found: error
+          retention-days: 14
       - run: pnpm exec playwright install --with-deps chromium && pnpm test:e2e
