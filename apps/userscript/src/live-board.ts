@@ -64,19 +64,6 @@ function visibleText(node: HTMLElement): string {
   return (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
-function movesFromNode(node: HTMLElement): string[] {
-  const san = node.getAttribute('data-san') || node.getAttribute('data-move-san') || node.getAttribute('data-notation');
-  if (san) {
-    const parsed = parseSanTokens(san);
-    if (parsed.length) return parsed;
-  }
-  const uci = node.getAttribute('data-uci') || node.getAttribute('data-move-uci');
-  if (uci && UCI.test(uci)) {
-    try { return replayUci([uci]).map((ply) => ply.san); } catch { /* Try rendered text below. */ }
-  }
-  return parseSanTokens(visibleText(node));
-}
-
 function orderedAttributeMoves(nodes: HTMLElement[]): string[] {
   const ordered = nodes
     .map((node, index) => ({ node, index, ply: Number(node.getAttribute('data-ply')) }))
