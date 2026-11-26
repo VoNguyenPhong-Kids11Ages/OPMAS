@@ -7,12 +7,13 @@ import { createTranslator, LOCALES } from '@opmas/localization';
 import { checkGate } from '@opmas/safety-gate';
 import { fetchStatus } from '@opmas/integrations';
 import { parseGameUrl, isPlayContext } from '@opmas/safety-gate';
-import { readLiveMoves } from './live-board';
+import { getLiveSearchRoots, readLiveMoves } from './live-board';
+import { CHESSNUT_PIECES } from '../../../packages/ui-components/src/chessnut-pieces';
 
 const db = new OpeningDatabase(openings as Opening[]);
 const KEYS = { language: 'opmas-language', favorites: 'opmas-favorites-v2', safety: 'opmas-safety-v2' };
 let tr = createTranslator(localStorage.getItem(KEYS.language) ?? 'vi');
-type Tab = 'explorer' | 'analyzer' | 'favorites';
+type Tab = 'live' | 'explorer' | 'analyzer' | 'favorites';
 let activeTab: Tab = 'explorer';
 let selectedEco: string | null = null;
 let gateAllowed = false;
@@ -37,6 +38,7 @@ const style = {
 };
 
 function t(vi: string, en: string): string { return tr.code === 'vi' ? vi : en; }
+function isLiveGameContext(): boolean { return !!parseGameUrl(location.href) || isPlayContext(location.href); }
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text = '', css = ''): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   node.textContent = text;
@@ -163,8 +165,9 @@ function makeHeader(): HTMLElement {
   return header;
 }
 function makeTabs(): HTMLElement {
-  const nav = el('nav', '', 'display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:5px;background:#f3f6fa;border-radius:12px;margin:10px 0 13px');
+  const nav = el('nav', '', 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:5px;background:#f3f6fa;border-radius:12px;margin:10px 0 13px');
   const tabs: Array<[Tab, string]> = [
+    ['live', t('Ván đang chơi', 'Live game')],
     ['explorer', t('Khám phá', 'Explorer')],
     ['analyzer', 'PGN'],
     ['favorites', t('Đã lưu', 'Saved')],
@@ -183,26 +186,51 @@ function makeSectionTitle(title: string, subtitle: string): HTMLElement {
   return wrap;
 }
 
-const pieces: Record<string, string> = {
-  K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
-  k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
-};
-function renderBoard(fen: string, host: HTMLElement): void {
-  const board = el('div', '', 'display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:min(100%,300px);aspect-ratio:1;margin:10px auto;border:4px solid #d9e2ed;border-radius:7px;overflow:hidden');
+const PIECE_URLS: Record<string, string> = Object.fromEntries(
+  Object.entries(CHESSNUT_PIECES).map(([piece, svg]) => [
+    piece,
+    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+  ]),
+);
+
+function renderBoard(fen: string, host: HTMLElement, lastMove?: string): void {
+  const highlighted = new Set<string>();
+  if (lastMove && /^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(lastMove)) {
+    highlighted.add(lastMove.slice(0, 2));
+    highlighted.add(lastMove.slice(2, 4));
+  }
+  const board = el('div', '', 'display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:min(100%,360px);aspect-ratio:1;margin:14px auto;padding:4px;border:1px solid #243248;border-radius:13px;overflow:hidden;box-shadow:0 12px 30px #17243a30;background:linear-gradient(145deg,#35465e,#1d2a3c);isolation:isolate');
+  board.setAttribute('role', 'img');
+  board.setAttribute('aria-label', 'OPMAS chess board');
   const rows = fen.split(' ')[0]?.split('/') ?? [];
-  rows.forEach((row, rank) => {
+  const files = 'abcdefgh';
+  rows.slice(0, 8).forEach((row, rank) => {
     let file = 0;
     for (const char of row) {
-      if (/^[1-8]$/.test(char)) {
-        const emptyCount = Number(char);
-        for (let n = 0; n < emptyCount; n++, file++) {
-          const square = el('div', '', `display:grid;place-items:center;background:${(rank + file) % 2 === 0 ? '#edf2f7' : '#9bb4cf'};font-size:clamp(16px,5vw,29px)`);
-          board.append(square);
+      const count = /^[1-8]$/.test(char) ? Number(char) : 1;
+      for (let n = 0; n < count && file < 8; n++, file++) {
+        const light = (rank + file) % 2 === 0;
+        const squareName = `${files[file]}${8 - rank}`;
+        const squareColor = highlighted.has(squareName) ? '#e8c75a' : light ? '#e8edf4' : '#71869f';
+        const square = el('div', '', `position:relative;display:grid;place-items:center;min-width:0;aspect-ratio:1;background:${squareColor};overflow:hidden`);
+        if (!/^[1-8]$/.test(char) && n === 0) {
+          const image = el('img') as HTMLImageElement;
+          image.src = PIECE_URLS[char] ?? '';
+          image.alt = char;
+          image.draggable = false;
+          image.decoding = 'async';
+          image.style.cssText = 'display:block;width:94%;height:94%;object-fit:contain;filter:drop-shadow(0 2px 2px #17243a45);pointer-events:none;user-select:none';
+          square.append(image);
         }
-      } else {
-        const square = el('div', pieces[char] ?? '', `display:grid;place-items:center;background:${(rank + file) % 2 === 0 ? '#edf2f7' : '#9bb4cf'};font-size:clamp(16px,5vw,29px);line-height:1;color:${char === char.toUpperCase() ? '#fff' : '#17243a'};text-shadow:${char === char.toUpperCase() ? '0 1px 2px #17243a,1px 0 1px #17243a' : 'none'}`);
+        if (file === 0) {
+          const rankLabel = el('span', String(8 - rank), `position:absolute;top:2px;left:3px;font:700 9px/1 system-ui;color:${light ? '#71869f' : '#e8edf4'};opacity:.9;pointer-events:none`);
+          square.append(rankLabel);
+        }
+        if (rank === 7) {
+          const fileLabel = el('span', files[file] ?? '', `position:absolute;right:3px;bottom:2px;font:700 9px/1 system-ui;color:${light ? '#769656' : '#eeeed2'};opacity:.9;pointer-events:none`);
+          square.append(fileLabel);
+        }
         board.append(square);
-        file++;
       }
     }
   });
@@ -335,20 +363,26 @@ function renderLiveDetector(host: HTMLElement): void {
   const banner = el('div', '', 'padding:11px 12px;border:1px solid #b8d7fb;border-radius:11px;background:#eff6ff;color:#174b83;font-size:12px;line-height:1.55');
   banner.append(
     el('div', '● LIVE · READ-ONLY', 'font-size:11px;font-weight:900;letter-spacing:.7px;color:#1769d2'),
-    el('div', t('Đang đọc lịch sử nước đi hiển thị trên ', 'Reading the visible move list on ') + siteLabel + t('. Chỉ nhận diện khai cuộc, không gợi ý nước đi.', '. Opening identification only; no move suggestions.')),
+    el('div', t('Đang đồng bộ ván cờ từ ' + siteLabel + '. Bàn cờ OPMAS cập nhật theo sự kiện nước đi; chỉ nhận diện khai cuộc.', 'Synchronizing the game from ' + siteLabel + '. OPMAS board updates on move events; opening identification only.')),
   );
-  const status = el('div', t('Đang chờ dữ liệu nước đi…', 'Waiting for move-list data…'), style.muted);
+  const status = el('div', t('Đang chờ dữ liệu nước đi…', 'Waiting for move data…'), style.muted);
   const result = el('div');
+  const boardHost = el('div');
+  const boardCaption = el('div', t('Bàn cờ đồng bộ', 'Synchronized board'), 'font-size:12px;font-weight:850;margin:12px 0 4px;color:#31445e');
+  const boardMeta = el('div', t('Chưa có vị trí ván cờ.', 'No game position yet.'), style.muted);
   const moveLine = el('pre', '', 'white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:9px;background:#f5f8fc;color:#31445e;font:12px/1.7 ui-monospace,SFMono-Regular,monospace');
   const refresh = actionButton(t('Làm mới', 'Refresh'), () => update(), true);
   const details = el('div');
+  renderBoard(START_FEN, boardHost);
   host.append(
-    makeSectionTitle(t('Live Opening Detector', 'Live Opening Detector'), t('Theo dõi tên khai cuộc và biến thể từ move list của bàn cờ được hỗ trợ.', 'Identify the opening and variation from the supported board move list.')),
-    banner, status, result, el('div', t('Lịch sử nước đi đọc được', 'Detected move history'), 'font-size:12px;font-weight:800;margin:12px 0 5px;color:#31445e'),
+    makeSectionTitle(t('Live Opening Detector', 'Live Opening Detector'), t('Tự đọc danh sách nước đi hiển thị trên Lichess/Chess.com, đồng bộ vị trí và nhận diện biến thể theo từng nước.', 'Reads the visible move list on Lichess/Chess.com, mirrors the position, and identifies opening variations move by move.')),
+    banner, status, result, boardCaption, boardHost, boardMeta,
+    el('div', t('Lịch sử nước đi đọc được', 'Detected move history'), 'font-size:12px;font-weight:800;margin:12px 0 5px;color:#31445e'),
     moveLine, refresh, details,
   );
 
   let lastSignature = '';
+  let lastFen = START_FEN;
   function update(): void {
     if (panel.style.display === 'none') return;
     const live = readLiveMoves(document, location.href);
@@ -357,32 +391,65 @@ function renderLiveDetector(host: HTMLElement): void {
       return;
     }
     const signature = live.moves.join(' ');
-    if (signature === lastSignature) return;
-    lastSignature = signature;
-    moveLine.textContent = signature || t('Chưa đọc được nước đi. Mở move list hoặc đợi trang tải xong.', 'No moves detected yet. Open the move list or wait for the page to load.');
+    if (signature === lastSignature && live.moves.length > 0) return;
+    moveLine.textContent = signature || t('Chưa đọc được nước đi. Mở move list hoặc đợi trang tải xong.', 'No moves detected yet. OPMAS will retry automatically.');
     status.textContent = live.moves.length
-      ? t(`Đã đọc ${live.moves.length} nửa nước · cập nhật tự động`, `Read ${live.moves.length} plies · auto-updating`)
-      : t('Chưa có dữ liệu move list. OPMAS sẽ thử lại tự động.', 'No move-list data yet. OPMAS will retry automatically.');
+      ? t('Đã đồng bộ ' + live.moves.length + ' nửa nước · nguồn ' + live.source, 'Synchronized ' + live.moves.length + ' plies · source ' + live.source)
+      : t('Chưa có dữ liệu move list. OPMAS sẽ chờ sự kiện DOM tiếp theo.', 'No move-list data yet. OPMAS is waiting for the next DOM event.');
+
+    // Replay the actual game moves onto OPMAS's own board.
+    try {
+      const frames = replay(live.moves);
+      const latest = frames[frames.length - 1];
+      if (latest?.fen) {
+        lastFen = latest.fen;
+        renderBoard(lastFen, boardHost, latest.uci);
+        boardMeta.textContent = t('Vị trí hiện tại · ' + live.moves.length + ' nửa nước · lượt ' + (live.moves.length % 2 === 0 ? 'Trắng' : 'Đen'), 'Current position · ' + live.moves.length + ' plies · ' + (live.moves.length % 2 === 0 ? 'White' : 'Black') + ' to move');
+      } else {
+        renderBoard(lastFen, boardHost);
+      }
+    } catch {
+      boardMeta.textContent = t('Move list đang tải hoặc có SAN chưa hoàn chỉnh; OPMAS sẽ tự thử lại.', 'The move list is loading or contains incomplete SAN; OPMAS will retry automatically.');
+      status.textContent = t('Đang chờ danh sách nước đi ổn định…', 'Waiting for a stable move list…');
+      return;
+    }
+
     result.replaceChildren();
     details.replaceChildren();
-    if (!live.moves.length) return;
+    if (!live.moves.length) {
+      boardMeta.textContent = t('Đang chờ nước đi đầu tiên…', 'Waiting for the first move…');
+      return;
+    }
 
-    const detection = detectOpening(db, live.moves);
+    let detection: ReturnType<typeof detectOpening>;
+    try { detection = detectOpening(db, live.moves); }
+    catch {
+      status.textContent = t('Move list đang cập nhật dở; OPMAS sẽ thử lại khi có nước đi mới.', 'The move list is mid-update; OPMAS will retry after the next move event.');
+      return;
+    }
+    lastSignature = signature;
     if (!detection) {
-      result.append(el('div', t('Chưa khớp khai cuộc trong thư viện OPMAS.', 'No matching opening found in the OPMAS library.'), `padding:12px;border:1px solid #f1dfb9;border-radius:10px;background:#fffaf0;color:${palette.amber};font-size:12px`));
+      result.append(el('div', t('Chưa khớp khai cuộc trong thư viện OPMAS.', 'No matching opening found in the OPMAS library.'), 'padding:12px;border:1px solid #f1dfb9;border-radius:10px;background:#fffaf0;color:' + palette.amber + ';font-size:12px'));
       return;
     }
     const card = el('article', '', style.card);
+    const afterTheory = live.moves.slice(detection.ply);
+    const openingFinished = detection.ply >= detection.opening.ply && live.moves.length > detection.opening.ply;
+    if (openingFinished) boardMeta.textContent = t('✓ ĐÃ HOÀN THÀNH PHẦN KHAI CUỘC · vị trí hiện tại vẫn được đồng bộ', '✓ OPENING PHASE COMPLETED · board position remains synchronized');
     card.append(
       el('div', detection.opening.name, 'font-size:16px;font-weight:900;color:#17243a'),
-      el('div', `ECO ${detection.opening.eco} · ${detection.opening.ply} ${t('nửa nước trong dòng lý thuyết', 'theory plies')}`, 'margin-top:4px;color:#1769d2;font-size:12px;font-weight:800'),
+      el('div', 'ECO ' + detection.opening.eco + ' · ' + detection.opening.ply + ' ' + t('nửa nước lý thuyết', 'theory plies'), 'margin-top:4px;color:#1769d2;font-size:12px;font-weight:800'),
       el('p', detection.exact
         ? t('Khớp chính xác với dòng khai cuộc trong cơ sở dữ liệu.', 'Exact match with a line in the opening database.')
-        : t('Đây là vị trí khớp sâu nhất tìm được; ván có thể đã đi vào biến phụ hoặc chuyển vị.', 'Deepest matching position found; the game may have entered a side variation or transposition.'), style.muted),
+        : t('Đây là vị trí khớp sâu nhất tìm được; ván có thể đã chuyển sang biến phụ hoặc chuyển vị.', 'Deepest matching position found; the game may have entered a side variation or transposition.'), style.muted),
     );
-    const afterTheory = live.moves.slice(detection.ply);
+    if (openingFinished) {
+      card.append(el('div', '✓ ' + t('ĐÃ HOÀN THÀNH PHẦN KHAI CUỘC', 'OPENING PHASE COMPLETED'), 'padding:10px;margin:9px 0;border:1px solid #a7dfc8;border-radius:9px;background:#edfaf4;color:#08734f;font-size:12px;font-weight:900;letter-spacing:.3px'));
+    } else {
+      card.append(el('div', t('Đang trong phần khai cuộc…', 'Opening phase in progress…'), 'padding:9px;margin:9px 0;border-radius:8px;background:#f5f8fc;color:#53657c;font-size:12px;font-weight:750'));
+    }
     card.append(el('div', afterTheory.length
-      ? t(`Sau đoạn lý thuyết: ${afterTheory.join(' ')}`, `Moves after the matched theory: ${afterTheory.join(' ')}`)
+      ? t('Sau đoạn lý thuyết đã khớp: ' + afterTheory.join(' '), 'Moves after matched theory: ' + afterTheory.join(' '))
       : t('Chưa có nước đi vượt khỏi đoạn lý thuyết được nhận diện.', 'No moves beyond the detected theory line yet.'), 'padding:9px;border-radius:8px;background:#f5f8fc;color:#31445e;font-size:11px;line-height:1.6'));
     card.append(actionButton(t('Lưu khai cuộc', 'Save opening'), () => {
       const favorites = getFavorites();
@@ -393,18 +460,46 @@ function renderLiveDetector(host: HTMLElement): void {
     }));
     result.append(card);
   }
-  update();
-  liveObserver = new MutationObserver(() => update());
-  if (document.body) liveObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-  liveRefreshTimer = window.setInterval(update, 1400);
-}
 
+  // Observe the page and all currently-open shadow roots. Re-scan after
+  // DOM changes so newly-mounted web components are attached automatically.
+  let updateQueued = false;
+  const observerOptions: MutationObserverInit = { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'data-san', 'data-ply'] };
+  function attachLiveObservers(): void {
+    for (const root of getLiveSearchRoots(document)) {
+      const target: Node = root === document ? document.documentElement : root;
+      if (target) liveObserver?.observe(target, observerOptions);
+    }
+  }
+  liveObserver = new MutationObserver(() => {
+    if (updateQueued) return;
+    updateQueued = true;
+    window.setTimeout(() => {
+      updateQueued = false;
+      attachLiveObservers();
+      update();
+    }, 90);
+  });
+  attachLiveObservers();
+  update();
+  // Fallback also catches site changes that do not mutate an observed open root.
+  liveRefreshTimer = window.setInterval(update, 900);
+}
 function renderContent(): void {
   content.replaceChildren(makeTabs());
+  if (activeTab === 'live') {
+    if (liveMode) {
+      const view = el('div');
+      content.append(view);
+      renderLiveDetector(view);
+    } else {
+      content.append(makeSectionTitle(t('Giúp đỡ ván đang chơi', 'Live game help'), t('Mở một ván trên Chess.com hoặc Lichess, sau đó chọn mục này để OPMAS đồng bộ bàn cờ và nhận diện khai cuộc.', 'Open a game on Chess.com or Lichess, then choose this section to mirror the board and identify the opening.')));
+      content.append(el('div', t('Chưa phát hiện ván đang chơi. Hãy mở một trang ván cờ được hỗ trợ rồi nhấn “Ván đang chơi”.', 'No active game detected. Open a supported game page, then select “Live game”.'), 'padding:12px;border:1px solid #b8d7fb;border-radius:11px;background:#eff6ff;color:#174b83;font-size:12px;line-height:1.6'));
+    }
+    return;
+  }
   if (liveMode) {
-    const view = el('div');
-    content.append(view);
-    renderLiveDetector(view);
+    content.append(el('div', t('Trên trang đang chơi, OPMAS chỉ bật mục “Ván đang chơi” để đồng bộ bàn cờ và tra cứu khai cuộc; các công cụ phân tích khác sẽ mở sau khi ván kết thúc.', 'During a live game, OPMAS keeps the live board and opening identification available; other analysis tools unlock after the game ends.'), 'padding:12px;border:1px solid #f4d7a2;border-radius:11px;background:#fff8e9;color:#87520c;font-size:12px;line-height:1.6'));
     return;
   }
   if (!gateAllowed) {
@@ -421,10 +516,12 @@ function renderContent(): void {
 async function render(focus: 'search' | 'pgn' | null = null): Promise<void> {
   const token = ++renderToken;
   panel.replaceChildren(makeHeader(), notice, content);
-  const isSupportedGame = !!parseGameUrl(location.href) || isPlayContext(location.href);
+  const isSupportedGame = isLiveGameContext();
   const gate = isSupportedGame ? { allowed: false as const, reason: 'game-in-progress' as const } : await checkGate(location.href, fetchStatus);
   if (token !== renderToken) return;
   liveMode = isSupportedGame;
+  if (liveMode) activeTab = 'live';
+  else if (activeTab === 'live') activeTab = 'explorer';
   gateAllowed = gate.allowed;
   const status = el('div', '', 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:9px;background:#f5f8fc;color:#718096;font-size:11px');
   status.append(el('span', `${db.size.toLocaleString()} ${t('khai cuộc trong thư viện', 'openings in library')}`), el('span', liveMode ? '● LIVE · READ-ONLY' : gateAllowed ? '● Ready' : '● Locked', `font-weight:800;color:${liveMode ? palette.blue : gateAllowed ? palette.green : palette.amber}`));
@@ -463,6 +560,10 @@ let mountObserverStarted = false;
 const mountObserver = new MutationObserver(() => ensureMounted());
 function bootMount(): void {
   ensureMounted();
+  if (isLiveGameContext() && confirmSafety()) {
+    panel.style.display = 'block';
+    void render();
+  }
   if (document.documentElement && !mountObserverStarted) {
     mountObserverStarted = true;
     mountObserver.observe(document.documentElement, { childList: true, subtree: true });
@@ -474,6 +575,10 @@ window.addEventListener('pageshow', ensureMounted);
 window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && panel.style.display !== 'none') closePanel(); });
 
 if (registerMenu) {
+  registerMenu('♞ OPMAS — Help current game', () => {
+    if (isLiveGameContext()) openPanel('live');
+    else setNotice(t('Mở một ván Chess.com hoặc Lichess trước nhé.', 'Open a Chess.com or Lichess game first.'));
+  });
   registerMenu('♞ OPMAS — Open Explorer', () => openPanel('explorer', 'search'));
   registerMenu('OPMAS — Analyze PGN', () => openPanel('analyzer', 'pgn'));
   registerMenu('OPMAS — Saved openings', () => openPanel('favorites'));
@@ -484,6 +589,10 @@ window.setInterval(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     stopLiveMonitor();
+    if (isLiveGameContext()) {
+      if (confirmSafety()) panel.style.display = 'block';
+      else closePanel();
+    }
     if (panel.style.display !== 'none') void render();
   }
 }, 1200);
