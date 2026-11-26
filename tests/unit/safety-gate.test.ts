@@ -5,6 +5,9 @@ describe('parseGameUrl', () => {
   it('parses lichess and chess.com game links', () => {
     expect(parseGameUrl('https://lichess.org/AbCd1234/black')).toEqual({ site: 'lichess', id: 'AbCd1234' });
     expect(parseGameUrl('https://www.chess.com/game/live/123456789')).toEqual({ site: 'chesscom', kind: 'live', id: '123456789' });
+    expect(parseGameUrl('https://www.chess.com/game/daily/987654321')).toEqual({ site: 'chesscom', kind: 'daily', id: '987654321' });
+    expect(parseGameUrl('https://www.chess.com/analysis/game/daily/42')?.kind).toBe('daily');
+    expect(parseGameUrl('https://www.chess.com/live/game/123456789')).toEqual({ site: 'chesscom', kind: 'live', id: '123456789' });
     expect(parseGameUrl('https://www.chess.com/analysis/game/daily/42')?.kind).toBe('daily');
   });
   it('rejects non-game pages', () => {
