@@ -137,9 +137,13 @@ export function readLiveMoves(doc: Document, href: string): LiveMoves | null {
       if (!nodes.length) continue;
 
       // First try explicit per-move attributes; they survive hidden/compact move-list rendering.
-      const attributeNodes = nodes.filter((node) =>
-        node.hasAttribute('data-san') || node.hasAttribute('data-move-san') ||
-        node.hasAttribute('data-uci') || node.hasAttribute('data-move-uci'));
+      const attributeNodes = nodes.filter((node) => {
+        if (typeof node.getAttribute !== 'function') return false;
+        return Boolean(
+          node.getAttribute('data-san') || node.getAttribute('data-move-san') ||
+          node.getAttribute('data-uci') || node.getAttribute('data-move-uci'),
+        );
+      });
       const attributeMoves = orderedAttributeMoves(attributeNodes);
       const candidates: Array<{ moves: string[]; source: string }> = [];
       if (attributeMoves.length) candidates.push({ moves: attributeMoves, source: selector + ' [move attributes]' });
