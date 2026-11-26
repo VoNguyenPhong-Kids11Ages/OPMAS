@@ -33,7 +33,7 @@ export function parseGameUrl(url: string): GameRef | null {
     return { site: 'lichess', id: first.slice(0, 8) };
   }
   if (p.host === 'chess.com') {
-    const m = p.path.join('/').match(/(?:^|\/)(live|daily)\/(?:game\/)?(\d+)$/);
+    const m = p.path.join('/').match(/(?:^|\/)(?:game\/)?(live|daily)\/(?:game\/)?(\d+)$/);
     return m ? { site: 'chesscom', kind: m[1] as 'live' | 'daily', id: m[2]! } : null;
   }
   return null;
