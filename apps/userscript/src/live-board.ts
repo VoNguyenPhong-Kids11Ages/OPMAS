@@ -78,21 +78,27 @@ function movesFromNode(node: HTMLElement): string[] {
 }
 
 function orderedAttributeMoves(nodes: HTMLElement[]): string[] {
-  const withPly = nodes
+  const ordered = nodes
     .map((node, index) => ({ node, index, ply: Number(node.getAttribute('data-ply')) }))
-    .filter((entry) => Number.isInteger(entry.ply) && entry.ply > 0)
-    .sort((a, b) => a.ply - b.ply || a.index - b.index);
-  if (withPly.length >= 2) {
-    const result: string[] = [];
-    for (const entry of withPly) {
-      const move = movesFromNode(entry.node);
-      if (move.length) result.push(...move);
-    }
-    if (result.length) return result;
+    .sort((a, b) => {
+      const aValid = Number.isInteger(a.ply) && a.ply > 0;
+      const bValid = Number.isInteger(b.ply) && b.ply > 0;
+      return aValid && bValid ? a.ply - b.ply || a.index - b.index : a.index - b.index;
+    });
+  const uciMoves = ordered
+    .map(({ node }) => node.getAttribute('data-uci') || node.getAttribute('data-move-uci') || '')
+    .filter((move) => UCI.test(move));
+  if (uciMoves.length >= 2) {
+    try { return replayUci(uciMoves).map((ply) => ply.san); } catch { /* Fall back to SAN attributes/text. */ }
   }
   const result: string[] = [];
-  for (const node of nodes) {
-    const move = movesFromNode(node);
+  for (const { node } of ordered) {
+    const san = node.getAttribute('data-san') || node.getAttribute('data-move-san') || node.getAttribute('data-notation');
+    if (san) {
+      const parsed = parseSanTokens(san);
+      if (parsed.length) { result.push(...parsed); continue; }
+    }
+    const move = parseSanTokens(visibleText(node));
     if (move.length) result.push(...move);
   }
   return result;
