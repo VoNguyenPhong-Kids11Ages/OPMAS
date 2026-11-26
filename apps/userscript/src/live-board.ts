@@ -1,3 +1,5 @@
+import { replayUci } from '@opmas/chess-core';
+
 export type LiveSite = 'lichess' | 'chesscom';
 
 export interface LiveMoves {
@@ -8,6 +10,7 @@ export interface LiveMoves {
 }
 
 const SAN = /^(?:O-O(?:-O)?[+#]?|0-0(?:-0)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?)$/;
+const UCI = /^[a-h][1-8][a-h][1-8][qrbn]?$/i;
 
 /** Convert move-list text into SAN tokens. This deliberately ignores clocks, move numbers and comments. */
 export function parseSanTokens(text: string): string[] {
@@ -27,27 +30,14 @@ export function parseSanTokens(text: string): string[] {
 
 const SELECTORS: Record<LiveSite, string[]> = {
   lichess: [
-    '.round__app .moves .move',
-    '.round__app .moves',
-    '.analyse__moves .move',
-    '.analyse__moves',
-    '.moves .move',
-    '.move-list .move',
-    'l4x .move',
-    '[data-ply]',
-    '[data-san]',
+    '.round__app .moves .move', '.round__app .moves', '.analyse__moves .move',
+    '.analyse__moves', '.moves .move', '.move-list .move', 'l4x .move',
+    '[data-ply][data-san]', '[data-san]', '[data-ply]',
   ],
   chesscom: [
-    'wc-simple-move-list',
-    'wc-move-list',
-    'wc-move-list-move',
-    '.move-list-component',
-    '.move-list-row',
-    '.move-text-component',
-    '.node',
-    '.move-list .move',
-    '[data-ply]',
-    '[data-san]',
+    'wc-simple-move-list', 'wc-move-list', 'wc-move-list-move',
+    '.move-list-component', '.move-list-row', '.move-text-component',
+    '.node', '.move-list .move', '[data-ply][data-san]', '[data-san]', '[data-ply]',
   ],
 };
 
@@ -74,10 +64,43 @@ function visibleText(node: HTMLElement): string {
   return (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
+function movesFromNode(node: HTMLElement): string[] {
+  const san = node.getAttribute('data-san') || node.getAttribute('data-move-san') || node.getAttribute('data-notation');
+  if (san) {
+    const parsed = parseSanTokens(san);
+    if (parsed.length) return parsed;
+  }
+  const uci = node.getAttribute('data-uci') || node.getAttribute('data-move-uci');
+  if (uci && UCI.test(uci)) {
+    try { return replayUci([uci]).map((ply) => ply.san); } catch { /* Try rendered text below. */ }
+  }
+  return parseSanTokens(visibleText(node));
+}
+
+function orderedAttributeMoves(nodes: HTMLElement[]): string[] {
+  const withPly = nodes
+    .map((node, index) => ({ node, index, ply: Number(node.getAttribute('data-ply')) }))
+    .filter((entry) => Number.isInteger(entry.ply) && entry.ply > 0)
+    .sort((a, b) => a.ply - b.ply || a.index - b.index);
+  if (withPly.length >= 2) {
+    const result: string[] = [];
+    for (const entry of withPly) {
+      const move = movesFromNode(entry.node);
+      if (move.length) result.push(...move);
+    }
+    if (result.length) return result;
+  }
+  const result: string[] = [];
+  for (const node of nodes) {
+    const move = movesFromNode(node);
+    if (move.length) result.push(...move);
+  }
+  return result;
+}
+
 /**
  * Lichess embeds the current game's move history in its bootstrap JSON.
- * Treat it as a fallback: the visible move list wins whenever it is at least
- * as complete, because page-init-data may be a snapshot from page load.
+ * It is a fallback because visible DOM/data attributes are refreshed as the game progresses.
  */
 function readLichessBootstrapMoves(doc: Document): string[] {
   const script = doc.querySelector<HTMLScriptElement>('#page-init-data');
@@ -93,7 +116,6 @@ function readLichessBootstrapMoves(doc: Document): string[] {
         typeof step.ply === 'number' && Number.isInteger(step.ply) && step.ply > 0 && typeof step.san === 'string' && step.san.length > 0)
       .sort((a, b) => a.ply - b.ply)
       .map((step) => step.san);
-    // A partially serialized bootstrap payload must not replace a good DOM read.
     if (typeof game.turns === 'number' && moves.length > game.turns) return [];
     return moves;
   } catch {
@@ -102,18 +124,14 @@ function readLichessBootstrapMoves(doc: Document): string[] {
 }
 
 /**
- * Read only the visible move list from a supported chess site. No board clicks,
- * move submission, engine access, network requests or opponent-control behavior.
+ * Read-only move-history reader. It never clicks, submits moves, reads an engine,
+ * sends network requests, or controls either player.
  */
 export function readLiveMoves(doc: Document, href: string): LiveMoves | null {
   let url: URL;
   try { url = new URL(href); } catch { return null; }
   const host = url.hostname.replace(/^www\./, '');
-  const site: LiveSite | null = host === 'lichess.org'
-    ? 'lichess'
-    : host === 'chess.com'
-      ? 'chesscom'
-      : null;
+  const site: LiveSite | null = host === 'lichess.org' ? 'lichess' : host === 'chess.com' ? 'chesscom' : null;
   if (!site) return null;
 
   let best: { moves: string[]; source: string } = { moves: [], source: '' };
@@ -121,28 +139,36 @@ export function readLiveMoves(doc: Document, href: string): LiveMoves | null {
   const roots = getLiveSearchRoots(doc);
 
   for (const selector of SELECTORS[site]) {
-    // Keep candidates root-local: a host's composed text can duplicate the same
-    // moves exposed by its shadow-root children.
     for (const root of roots) {
       const nodes = Array.from(root.querySelectorAll<HTMLElement>(selector));
       if (!nodes.length) continue;
 
-      // Prefer leaf nodes when a selector also matches a wrapper and its children.
+      // First try explicit per-move attributes; they survive hidden/compact move-list rendering.
+      const attributeNodes = nodes.filter((node) =>
+        node.hasAttribute('data-san') || node.hasAttribute('data-move-san') ||
+        node.hasAttribute('data-uci') || node.hasAttribute('data-move-uci'));
+      const attributeMoves = orderedAttributeMoves(attributeNodes);
+      const candidates: Array<{ moves: string[]; source: string }> = [];
+      if (attributeMoves.length) candidates.push({ moves: attributeMoves, source: selector + ' [move attributes]' });
+
+      // Prefer leaf nodes when selectors match both a wrapper and its children.
       const leafNodes = nodes.filter((node) => !nodes.some((other) => other !== node && node.contains(other)));
       const sample = leafNodes.length ? leafNodes : nodes;
       const joined = sample.map(visibleText).filter(Boolean).join(' ');
-      const moves = parseSanTokens(joined);
-      const signature = moves.join(' ');
-      if (!signature || seen.has(signature)) continue;
-      seen.add(signature);
-      if (moves.length > best.moves.length) best = { moves, source: selector };
+      const textMoves = parseSanTokens(joined);
+      if (textMoves.length) candidates.push({ moves: textMoves, source: selector });
+
+      for (const candidate of candidates) {
+        const signature = candidate.moves.join(' ');
+        if (!signature || seen.has(signature)) continue;
+        seen.add(signature);
+        if (candidate.moves.length > best.moves.length) best = candidate;
+      }
     }
   }
 
-  // Keep fallback selectors narrow: broad game containers can include chat or annotations.
   if (best.moves.length < 2) {
-    const fallbackSelectors = ['[aria-label*="move" i]', '[aria-label*="notation" i]'];
-    for (const selector of fallbackSelectors) {
+    for (const selector of ['[aria-label*="move" i]', '[aria-label*="notation" i]']) {
       for (const root of roots) {
         const node = root.querySelector<HTMLElement>(selector);
         if (!node) continue;
